@@ -5,13 +5,9 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
-// func InitWalletDB(db *bolt.DB, encodedHash string, ) {
-
-// }
-
 // init bucket with hashed passphrase
-func InitAuthBucket(db *bolt.DB, encodedHash string) error {
-	return db.Update(func(tx *bolt.Tx) error {
+func (w *Wallet) InitAuthBucket(encodedHash string) error {
+	return w.db.Update(func(tx *bolt.Tx) error {
 		b, err := tx.CreateBucket([]byte("auth"))
 		if err != nil {
 			return err
@@ -20,8 +16,8 @@ func InitAuthBucket(db *bolt.DB, encodedHash string) error {
 	})
 }
 
-func InitUTXOBucket(db *bolt.DB) error {
-	return db.Update(func(tx *bolt.Tx) error {
+func (w *Wallet) InitUTXOBucket() error {
+	return w.db.Update(func(tx *bolt.Tx) error {
 		_, err := tx.CreateBucket([]byte("utxos"))
 		if err != nil {
 			return err
@@ -30,7 +26,7 @@ func InitUTXOBucket(db *bolt.DB) error {
 	})
 }
 
-func InitWalletMetadataBucket(db *bolt.DB, seed []byte, encodedHash string) error {
+func (w *Wallet) InitWalletMetadataBucket(seed []byte, encodedHash string) error {
 	master, acct0ext, acct0int, err := DeriveHDKeys(seed, encodedHash)
 	if err != nil {
 		return err
@@ -43,7 +39,7 @@ func InitWalletMetadataBucket(db *bolt.DB, seed []byte, encodedHash string) erro
 
 	encryptedMaster, encryptedAcct0ext, encryptedAcct0int, err := EncryptHDKeys(key, master, acct0ext, acct0int)
 
-	return db.Update(func(tx *bolt.Tx) error {
+	return w.db.Update(func(tx *bolt.Tx) error {
 		wallet, err := tx.CreateBucket([]byte("wallet_metadata"))
 		if err != nil {
 			return err
