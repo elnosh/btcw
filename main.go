@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/elnosh/btcw/wallet"
@@ -44,93 +46,48 @@ func main() {
 			return nil
 		})
 
-		encodedHash, err := wallet.CreateWalletPrompt()
+		reader := bufio.NewReader(os.Stdin)
+		fmt.Println("do you want to create a new wallet? (y/n)")
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			log.Fatal("error reading input, please try again")
+		}
+
+		input = strings.ToLower(strings.TrimSpace(input))
+		var encodedHash string
+		if input == "y" || input == "yes" {
+			encodedHash, err = wallet.PromptPassphrase()
+			if err != nil {
+				printExit(err.Error())
+			}
+		} else {
+			os.Exit(0)
+		}
+
+		err = wallet.InitAuthBucket(db, encodedHash)
 		if err != nil {
 			printExit(err.Error())
 		}
 
-		// set hashed passphrase in db
-		if err = db.Update(func(tx *bolt.Tx) error {
-			b, err := tx.CreateBucket([]byte("auth"))
-			if err != nil {
-				return err
-			}
-			return b.Put([]byte("encodedhash"), []byte(encodedHash))
-		}); err != nil {
-			printExit(err.Error())
-		}
-
-		// 2. generate master seed and have prompts to make sure user writes it down
 		seed, err := hdkeychain.GenerateSeed(hdkeychain.RecommendedSeedLen)
 		if err != nil {
-			// handle err
+			printExit(err.Error())
 		}
 
 		fmt.Println("Next will be the master seed. Write it down and store securely. Anyone with access to the seed has access to the funds.")
 		fmt.Printf("seed: %x\n", seed)
 
-		master, acct0, err := wallet.DeriveHDKeys(seed, encodedHash)
+		err = wallet.InitWalletMetadataBucket(db, seed, encodedHash)
 		if err != nil {
 			printExit(err.Error())
 		}
 
-		_, key, _, err := wallet.DecodeKey(encodedHash)
+		err = wallet.InitUTXOBucket(db)
 		if err != nil {
 			printExit(err.Error())
 		}
-
-		encryptedMaster, err := wallet.Encrypt([]byte(master.String()), key)
-		if err != nil {
-			printExit(err.Error())
-		}
-
-		// external chain of account 0 - path: m/44'/1'/0'/0
-		acct0ext, err := acct0.Derive(0)
-		if err != nil {
-			printExit(err.Error())
-		}
-
-		encryptedAcct0ext, err := wallet.Encrypt([]byte(acct0ext.String()), key)
-		if err != nil {
-			printExit(err.Error())
-		}
-
-		// internal chain of account 0 - path: m/44'/1'/0'/1
-		acct0int, err := acct0.Derive(1)
-		if err != nil {
-			printExit(err.Error())
-		}
-
-		encryptedAcct0int, err := wallet.Encrypt([]byte(acct0int.String()), key)
-		if err != nil {
-			printExit(err.Error())
-		}
-
-		// create wallet metadata bucket
-		if err = db.Update(func(tx *bolt.Tx) error {
-			wallet, err := tx.CreateBucket([]byte("wallet_metadata"))
-			if err != nil {
-				return err
-			}
-			// set balance field key
-
-			// set derivation paths needed
-			if err = wallet.Put([]byte("master_seed"), encryptedMaster); err != nil {
-				return err
-			}
-
-			if err = wallet.Put([]byte("account_0_external"), encryptedAcct0ext); err != nil {
-				return err
-			}
-			if err = wallet.Put([]byte("account_0_internal"), encryptedAcct0int); err != nil {
-				return err
-			}
-			return nil
-		}); err != nil {
-			// handle err
-		}
-
 	}
+
 }
 
 func printExit(msg string) {
