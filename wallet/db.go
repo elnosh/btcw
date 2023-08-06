@@ -26,6 +26,16 @@ func (w *Wallet) InitUTXOBucket() error {
 	})
 }
 
+func (w *Wallet) InitKeysBucket() error {
+	return w.db.Update(func(tx *bolt.Tx) error {
+		_, err := tx.CreateBucket([]byte("keys"))
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
 func (w *Wallet) InitWalletMetadataBucket(seed []byte, encodedHash string) error {
 	master, acct0ext, acct0int, err := DeriveHDKeys(seed, encodedHash)
 	if err != nil {
@@ -45,8 +55,11 @@ func (w *Wallet) InitWalletMetadataBucket(seed []byte, encodedHash string) error
 			return err
 		}
 
-		// set balance
 		if err = wallet.Put([]byte("balance"), utils.Int64ToBytes(0)); err != nil {
+			return err
+		}
+
+		if err = wallet.Put([]byte("last_scanned_block"), utils.Int64ToBytes(0)); err != nil {
 			return err
 		}
 
