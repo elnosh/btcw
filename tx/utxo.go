@@ -1,4 +1,4 @@
-package utxo
+package tx
 
 import "github.com/btcsuite/btcd/btcjson"
 

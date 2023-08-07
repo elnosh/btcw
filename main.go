@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/elnosh/btcw/rpcserver"
 	"github.com/elnosh/btcw/wallet"
 )
 
@@ -28,6 +29,13 @@ func main() {
 		if err != nil {
 			printErr(err)
 		}
+	}
+
+	wallet := &wallet.Wallet{}
+
+	err := rpcserver.StartRPCServer(wallet)
+	if err != nil {
+		printErr(err)
 	}
 
 }
