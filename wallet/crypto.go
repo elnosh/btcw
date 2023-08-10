@@ -44,7 +44,7 @@ func hashPassphrase(passphrase []byte) (string, error) {
 	return encoded, nil
 }
 
-func VerifyPassphrase(encodedHash, passphrase string) bool {
+func verifyPassphrase(encodedHash, passphrase string) bool {
 	p, key, salt, err := DecodeKey(encodedHash)
 	if err != nil {
 		return false
@@ -118,7 +118,7 @@ func Decrypt(input, key []byte) ([]byte, error) {
 }
 
 func (w Wallet) GetDecodedKey() ([]byte, error) {
-	encodedHash := w.GetEncodedHash()
+	encodedHash := w.getEncodedHash()
 	if encodedHash == nil {
 		return nil, errors.New("encoded hash not found")
 	}

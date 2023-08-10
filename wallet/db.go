@@ -104,7 +104,7 @@ func (w *Wallet) InitWalletMetadataBucket(seed []byte, encodedHash string) error
 	})
 }
 
-func (w Wallet) GetEncodedHash() []byte {
+func (w Wallet) getEncodedHash() []byte {
 	var encodedHash []byte
 	w.db.View(func(tx *bolt.Tx) error {
 		walletMetadata := tx.Bucket([]byte(authBucket))
@@ -114,7 +114,47 @@ func (w Wallet) GetEncodedHash() []byte {
 	return encodedHash
 }
 
-func (w Wallet) GetAcct0Ext() []byte {
+func (w Wallet) getBalance() []byte {
+	var balance []byte
+	w.db.View(func(tx *bolt.Tx) error {
+		walletMetadata := tx.Bucket([]byte(walletMetadataBucket))
+		balance = walletMetadata.Get([]byte(balanceKey))
+		return nil
+	})
+	return balance
+}
+
+func (w Wallet) getLastExternalIdx() []byte {
+	var lastExternalIdx []byte
+	w.db.View(func(tx *bolt.Tx) error {
+		walletMetadata := tx.Bucket([]byte(walletMetadataBucket))
+		lastExternalIdx = walletMetadata.Get([]byte(lastExternalIdxKey))
+		return nil
+	})
+	return lastExternalIdx
+}
+
+func (w Wallet) getLastInternalIdx() []byte {
+	var lastInternalIdx []byte
+	w.db.View(func(tx *bolt.Tx) error {
+		walletMetadata := tx.Bucket([]byte(walletMetadataBucket))
+		lastInternalIdx = walletMetadata.Get([]byte(lastInternalIdxKey))
+		return nil
+	})
+	return lastInternalIdx
+}
+
+func (w Wallet) getLastScannedBlock() []byte {
+	var lastScannedBlock []byte
+	w.db.View(func(tx *bolt.Tx) error {
+		walletMetadata := tx.Bucket([]byte(walletMetadataBucket))
+		lastScannedBlock = walletMetadata.Get([]byte(lastScannedBlockKey))
+		return nil
+	})
+	return lastScannedBlock
+}
+
+func (w Wallet) getAcct0Ext() []byte {
 	var encryptedAcct0ext []byte
 	w.db.View(func(tx *bolt.Tx) error {
 		walletMetadata := tx.Bucket([]byte(walletMetadataBucket))

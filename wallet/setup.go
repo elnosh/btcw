@@ -11,14 +11,20 @@ import (
 	"strings"
 
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
+	"github.com/btcsuite/btcd/rpcclient"
+	"github.com/elnosh/btcw/utils"
 	bolt "go.etcd.io/bbolt"
 	"golang.org/x/term"
 )
 
 var ErrPass = errors.New("error reading passphrase, please try again")
 
+func NewWallet(db *bolt.DB) *Wallet {
+	return &Wallet{db: db}
+}
+
 func CreateWallet() error {
-	path := SetupWalletDir()
+	path := setupWalletDir()
 	db, err := bolt.Open(filepath.Join(path, "wallet.db"), 0600, nil)
 	if err != nil {
 		return errors.New("error setting wallet")
@@ -107,7 +113,7 @@ func promptPassphrase() (string, error) {
 	return encodedHash, nil
 }
 
-func SetupWalletDir() string {
+func setupWalletDir() string {
 	homedir, err := os.UserHomeDir()
 	if err != nil {
 		log.Fatal(err)
@@ -118,4 +124,35 @@ func SetupWalletDir() string {
 		log.Fatal(err)
 	}
 	return path
+}
+
+func LoadWallet(rpcuser, rpcpass string) (*Wallet, error) {
+	path := setupWalletDir()
+	db, err := bolt.Open(filepath.Join(path, "wallet.db"), 0600, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error opening db: %v", err)
+	}
+
+	connCfg := &rpcclient.ConnConfig{
+		Host:         "localhost:18443",
+		User:         rpcuser,
+		Pass:         rpcpass,
+		HTTPPostMode: true,
+		DisableTLS:   true,
+	}
+
+	client, err := rpcclient.New(connCfg, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error setting up rpc client: %v", err)
+	}
+
+	wallet := &Wallet{db: db, client: client}
+
+	// TODO: utxos
+	wallet.balance = utils.BytesToInt64(wallet.getBalance())
+	wallet.lastExternalIdx = utils.BytesToUint32(wallet.getLastExternalIdx())
+	wallet.lastInternalIdx = utils.BytesToUint32(wallet.getLastInternalIdx())
+	wallet.lastScannedBlock = utils.BytesToInt64(wallet.getLastScannedBlock())
+
+	return wallet, nil
 }

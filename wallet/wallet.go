@@ -22,21 +22,13 @@ type Wallet struct {
 	lastScannedBlock int64
 }
 
-func NewWallet(db *bolt.DB) *Wallet {
-	return &Wallet{db: db}
-}
-
-func (w *Wallet) Setdb(db *bolt.DB) {
-	w.db = db
-}
-
 func (w *Wallet) GetBalance() int64 {
 	return w.balance
 }
 
 func (w *Wallet) GetNewAddress() (string, error) {
 	// get account_0_external
-	encryptedAcct0ext := w.GetAcct0Ext()
+	encryptedAcct0ext := w.getAcct0Ext()
 	if encryptedAcct0ext == nil {
 		return "", errors.New("account 0 external not found")
 	}

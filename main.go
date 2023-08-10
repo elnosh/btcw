@@ -1,13 +1,12 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/elnosh/btcw/rpcserver"
 	"github.com/elnosh/btcw/wallet"
-	bolt "go.etcd.io/bbolt"
 )
 
 func main() {
@@ -18,21 +17,20 @@ func main() {
 		if err != nil {
 			printErr(err)
 		}
+	} else {
+		if flags.RPCUser == "" || flags.RPCPass == "" {
+			printErr(errors.New("RPC username and password are required to start wallet"))
+		}
+
+		// TODO: check if wallet exists
+
+		wallet, err := wallet.LoadWallet(flags.RPCUser, flags.RPCPass)
+
+		err = rpcserver.StartRPCServer(wallet)
+		if err != nil {
+			printErr(err)
+		}
 	}
-
-	path := wallet.SetupWalletDir()
-	db, err := bolt.Open(filepath.Join(path, "wallet.db"), 0600, nil)
-	if err != nil {
-		printErr(err)
-	}
-
-	wallet := wallet.NewWallet(db)
-
-	err = rpcserver.StartRPCServer(wallet)
-	if err != nil {
-		printErr(err)
-	}
-
 }
 
 func printErr(msg error) {
