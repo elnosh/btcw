@@ -3,26 +3,15 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/elnosh/btcw/rpcserver"
 	"github.com/elnosh/btcw/wallet"
+	bolt "go.etcd.io/bbolt"
 )
 
 func main() {
 	flags := parseFlags()
-
-	// nodeConnCfg := &rpcclient.ConnConfig{
-	// 	Host:         "localhost:18332",
-	// 	User:         flags.RPCUser,
-	// 	Pass:         flags.RPCPass,
-	// 	HTTPPostMode: true,
-	// 	DisableTLS:   true,
-	// }
-
-	// client, err := rpcclient.New(nodeConnCfg, nil)
-	// if err != nil {
-	// 	log.Fatal("error starting wallet")
-	// }
 
 	if flags.Create {
 		err := wallet.CreateWallet()
@@ -31,9 +20,15 @@ func main() {
 		}
 	}
 
-	wallet := &wallet.Wallet{}
+	path := wallet.SetupWalletDir()
+	db, err := bolt.Open(filepath.Join(path, "wallet.db"), 0600, nil)
+	if err != nil {
+		printErr(err)
+	}
 
-	err := rpcserver.StartRPCServer(wallet)
+	wallet := wallet.NewWallet(db)
+
+	err = rpcserver.StartRPCServer(wallet)
 	if err != nil {
 		printErr(err)
 	}

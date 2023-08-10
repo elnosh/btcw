@@ -18,7 +18,7 @@ import (
 var ErrPass = errors.New("error reading passphrase, please try again")
 
 func CreateWallet() error {
-	path := setupWalletDir()
+	path := SetupWalletDir()
 	db, err := bolt.Open(filepath.Join(path, "wallet.db"), 0600, nil)
 	if err != nil {
 		return errors.New("error setting wallet")
@@ -107,7 +107,7 @@ func promptPassphrase() (string, error) {
 	return encodedHash, nil
 }
 
-func setupWalletDir() string {
+func SetupWalletDir() string {
 	homedir, err := os.UserHomeDir()
 	if err != nil {
 		log.Fatal(err)

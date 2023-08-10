@@ -10,3 +10,13 @@ func (w *WalletRPC) GetBalance(args struct{}, reply *int64) error {
 	*reply = w.wallet.GetBalance()
 	return nil
 }
+
+func (w *WalletRPC) GetNewAddress(args struct{}, reply *string) error {
+	address, err := w.wallet.GetNewAddress()
+	if err != nil {
+		return err
+	}
+
+	*reply = address
+	return nil
+}

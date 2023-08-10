@@ -116,3 +116,18 @@ func Decrypt(input, key []byte) ([]byte, error) {
 
 	return decrypted, nil
 }
+
+func (w Wallet) GetDecodedKey() ([]byte, error) {
+	encodedHash := w.GetEncodedHash()
+	if encodedHash == nil {
+		return nil, errors.New("encoded hash not found")
+	}
+
+	// decode hash to get key
+	_, key, _, err := DecodeKey(string(encodedHash))
+	if err != nil {
+		return nil, fmt.Errorf("error decoding key: %v", err)
+	}
+
+	return key, nil
+}
