@@ -18,6 +18,7 @@ import (
 )
 
 var ErrPass = errors.New("error reading passphrase, please try again")
+var ErrWalletNotExists = errors.New("wallet does not exist")
 
 func NewWallet(db *bolt.DB) *Wallet {
 	return &Wallet{db: db}
@@ -30,15 +31,8 @@ func CreateWallet() error {
 		return errors.New("error setting wallet")
 	}
 
-	// check if a wallet already exists
-	if err = db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte("wallet_metadata"))
-		if b != nil {
-			return errors.New("wallet already exists")
-		}
-		return nil
-	}); err != nil {
-		return err
+	if walletExists(db) {
+		return errors.New("wallet already exists")
 	}
 
 	wallet := &Wallet{db: db}
@@ -126,11 +120,34 @@ func setupWalletDir() string {
 	return path
 }
 
+// check if a wallet already exists
+func walletExists(db *bolt.DB) bool {
+	exists := false
+	db.View(func(tx *bolt.Tx) error {
+		walletMetadata := tx.Bucket([]byte(walletMetadataBucket))
+		utxosb := tx.Bucket([]byte(utxosBucket))
+		keysb := tx.Bucket([]byte(keysBucket))
+		authb := tx.Bucket([]byte(authBucket))
+
+		if utxosb != nil && keysb != nil && authb != nil && walletMetadata != nil {
+			if walletMetadata.Get([]byte(masterSeedKey)) != nil {
+				exists = true
+			}
+		}
+		return nil
+	})
+	return exists
+}
+
 func LoadWallet(rpcuser, rpcpass string) (*Wallet, error) {
 	path := setupWalletDir()
 	db, err := bolt.Open(filepath.Join(path, "wallet.db"), 0600, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error opening db: %v", err)
+	}
+
+	if !walletExists(db) {
+		return nil, ErrWalletNotExists
 	}
 
 	connCfg := &rpcclient.ConnConfig{

@@ -22,11 +22,15 @@ func main() {
 			printErr(errors.New("RPC username and password are required to start wallet"))
 		}
 
-		// TODO: check if wallet exists
+		w, err := wallet.LoadWallet(flags.RPCUser, flags.RPCPass)
+		if err != nil {
+			if err == wallet.ErrWalletNotExists {
+				printErr(errors.New("A wallet does not exist. Please create one first with -create"))
+			}
+			printErr(err)
+		}
 
-		wallet, err := wallet.LoadWallet(flags.RPCUser, flags.RPCPass)
-
-		err = rpcserver.StartRPCServer(wallet)
+		err = rpcserver.StartRPCServer(w)
 		if err != nil {
 			printErr(err)
 		}
