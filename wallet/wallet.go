@@ -4,11 +4,14 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/elnosh/btcw/tx"
 	bolt "go.etcd.io/bbolt"
+)
+
+type (
+	address        = string
+	derivationPath = string
 )
 
 type Wallet struct {
@@ -20,6 +23,8 @@ type Wallet struct {
 	lastExternalIdx  uint32
 	lastInternalIdx  uint32
 	lastScannedBlock int64
+
+	addresses map[address]derivationPath
 }
 
 func (w *Wallet) GetBalance() int64 {
@@ -33,12 +38,12 @@ func (w *Wallet) GetNewAddress() (string, error) {
 		return "", errors.New("account 0 external not found")
 	}
 
-	key, err := w.GetDecodedKey()
+	passKey, err := w.GetDecodedKey()
 	if err != nil {
 		return "", err
 	}
 
-	acct0ext, err := Decrypt(encryptedAcct0ext, key)
+	acct0ext, err := Decrypt(encryptedAcct0ext, passKey)
 	if err != nil {
 		return "", err
 	}
@@ -59,7 +64,7 @@ func (w *Wallet) GetNewAddress() (string, error) {
 	// get new public/private key pair
 	// public key is serialized in compressed format
 	// private key is encrypted WIF
-	keyPair, err := NewKeyPair(newKey, key)
+	keyPair, err := NewKeyPair(newKey, passKey)
 	if err != nil {
 		return "", err
 	}
@@ -75,12 +80,5 @@ func (w *Wallet) GetNewAddress() (string, error) {
 		return "", err
 	}
 
-	// convert pub key -> addressPubKeyHash to return address as string
-	addrPubKey, err := btcutil.NewAddressPubKey(keyPair.PublicKey, &chaincfg.SimNetParams)
-	if err != nil {
-		return "", err
-	}
-
-	addrPubKeyHash := addrPubKey.AddressPubKeyHash().String()
-	return addrPubKeyHash, nil
+	return keyPair.Address, nil
 }

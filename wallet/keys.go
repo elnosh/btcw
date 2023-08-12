@@ -11,6 +11,8 @@ import (
 type KeyPair struct {
 	PublicKey           []byte `json:"publicKey"`  // serialized
 	EncryptedPrivateKey []byte `json:"privateKey"` // WIF
+	PublicKeyHash       []byte `json:"publicKeyHash"`
+	Address             string `json:"address"`
 }
 
 func NewKeyPair(extendedKey *hdkeychain.ExtendedKey, key []byte) (*KeyPair, error) {
@@ -29,11 +31,20 @@ func NewKeyPair(extendedKey *hdkeychain.ExtendedKey, key []byte) (*KeyPair, erro
 	// encrypt wif for storage
 	encryptedWIF, err := Encrypt([]byte(wif.String()), key)
 	if err != nil {
-		return nil, fmt.Errorf("error encrypting private key: %v", err)
+		return nil, fmt.Errorf("error encrypting private key: %v", err.Error())
 	}
 
 	// get serialized compressed public key from private key
 	serializedPubKey := wif.SerializePubKey()
-	keyPair := &KeyPair{PublicKey: serializedPubKey, EncryptedPrivateKey: encryptedWIF}
+	addrPubKey, err := btcutil.NewAddressPubKey(serializedPubKey, &chaincfg.SimNetParams)
+	if err != nil {
+		return nil, fmt.Errorf("error deriving address pub key: %v", err.Error())
+	}
+	addrPubKeyHash := addrPubKey.AddressPubKeyHash()
+	pubkeyHash := addrPubKeyHash.ScriptAddress()
+	addr := addrPubKeyHash.String()
+
+	keyPair := &KeyPair{PublicKey: serializedPubKey, EncryptedPrivateKey: encryptedWIF,
+		PublicKeyHash: pubkeyHash, Address: addr}
 	return keyPair, nil
 }

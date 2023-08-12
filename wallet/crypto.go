@@ -45,7 +45,7 @@ func hashPassphrase(passphrase []byte) (string, error) {
 }
 
 func verifyPassphrase(encodedHash, passphrase string) bool {
-	p, key, salt, err := DecodeKey(encodedHash)
+	p, key, salt, err := DecodeHash(encodedHash)
 	if err != nil {
 		return false
 	}
@@ -54,7 +54,7 @@ func verifyPassphrase(encodedHash, passphrase string) bool {
 	return subtle.ConstantTimeCompare(key, newkey) == 1
 }
 
-func DecodeKey(encodedHash string) (p *params, key, salt []byte, err error) {
+func DecodeHash(encodedHash string) (p *params, key, salt []byte, err error) {
 	invalidHashErr := errors.New("invalid hash")
 	split := strings.Split(encodedHash, "$")
 	if len(split) != 6 {
@@ -124,7 +124,7 @@ func (w Wallet) GetDecodedKey() ([]byte, error) {
 	}
 
 	// decode hash to get key
-	_, key, _, err := DecodeKey(string(encodedHash))
+	_, key, _, err := DecodeHash(string(encodedHash))
 	if err != nil {
 		return nil, fmt.Errorf("error decoding key: %v", err)
 	}

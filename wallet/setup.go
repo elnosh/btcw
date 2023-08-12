@@ -12,13 +12,14 @@ import (
 
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/rpcclient"
-	"github.com/elnosh/btcw/utils"
 	bolt "go.etcd.io/bbolt"
 	"golang.org/x/term"
 )
 
-var ErrPass = errors.New("error reading passphrase, please try again")
-var ErrWalletNotExists = errors.New("wallet does not exist")
+var (
+	ErrPass            = errors.New("error reading passphrase, please try again")
+	ErrWalletNotExists = errors.New("wallet does not exist")
+)
 
 func NewWallet(db *bolt.DB) *Wallet {
 	return &Wallet{db: db}
@@ -120,7 +121,6 @@ func setupWalletDir() string {
 	return path
 }
 
-// check if a wallet already exists
 func walletExists(db *bolt.DB) bool {
 	exists := false
 	db.View(func(tx *bolt.Tx) error {
@@ -166,10 +166,10 @@ func LoadWallet(rpcuser, rpcpass string) (*Wallet, error) {
 	wallet := &Wallet{db: db, client: client}
 
 	// TODO: utxos
-	wallet.balance = utils.BytesToInt64(wallet.getBalance())
-	wallet.lastExternalIdx = utils.BytesToUint32(wallet.getLastExternalIdx())
-	wallet.lastInternalIdx = utils.BytesToUint32(wallet.getLastInternalIdx())
-	wallet.lastScannedBlock = utils.BytesToInt64(wallet.getLastScannedBlock())
+	wallet.balance = wallet.getBalance()
+	wallet.lastExternalIdx = wallet.getLastExternalIdx()
+	wallet.lastInternalIdx = wallet.getLastInternalIdx()
+	wallet.lastScannedBlock = wallet.getLastScannedBlock()
 
 	return wallet, nil
 }

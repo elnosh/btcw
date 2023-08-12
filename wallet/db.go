@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/elnosh/btcw/utils"
@@ -62,7 +63,7 @@ func (w *Wallet) InitWalletMetadataBucket(seed []byte, encodedHash string) error
 		return err
 	}
 
-	_, key, _, err := DecodeKey(encodedHash)
+	_, key, _, err := DecodeHash(encodedHash)
 	if err != nil {
 		return err
 	}
@@ -114,43 +115,47 @@ func (w Wallet) getEncodedHash() []byte {
 	return encodedHash
 }
 
-func (w Wallet) getBalance() []byte {
-	var balance []byte
+func (w Wallet) getBalance() int64 {
+	var bytes []byte
 	w.db.View(func(tx *bolt.Tx) error {
 		walletMetadata := tx.Bucket([]byte(walletMetadataBucket))
-		balance = walletMetadata.Get([]byte(balanceKey))
+		bytes = walletMetadata.Get([]byte(balanceKey))
 		return nil
 	})
+	balance := utils.BytesToInt64(bytes)
 	return balance
 }
 
-func (w Wallet) getLastExternalIdx() []byte {
-	var lastExternalIdx []byte
+func (w Wallet) getLastExternalIdx() uint32 {
+	var bytes []byte
 	w.db.View(func(tx *bolt.Tx) error {
 		walletMetadata := tx.Bucket([]byte(walletMetadataBucket))
-		lastExternalIdx = walletMetadata.Get([]byte(lastExternalIdxKey))
+		bytes = walletMetadata.Get([]byte(lastExternalIdxKey))
 		return nil
 	})
+	lastExternalIdx := utils.BytesToUint32(bytes)
 	return lastExternalIdx
 }
 
-func (w Wallet) getLastInternalIdx() []byte {
-	var lastInternalIdx []byte
+func (w Wallet) getLastInternalIdx() uint32 {
+	var bytes []byte
 	w.db.View(func(tx *bolt.Tx) error {
 		walletMetadata := tx.Bucket([]byte(walletMetadataBucket))
-		lastInternalIdx = walletMetadata.Get([]byte(lastInternalIdxKey))
+		bytes = walletMetadata.Get([]byte(lastInternalIdxKey))
 		return nil
 	})
+	lastInternalIdx := utils.BytesToUint32(bytes)
 	return lastInternalIdx
 }
 
-func (w Wallet) getLastScannedBlock() []byte {
-	var lastScannedBlock []byte
+func (w Wallet) getLastScannedBlock() int64 {
+	var bytes []byte
 	w.db.View(func(tx *bolt.Tx) error {
 		walletMetadata := tx.Bucket([]byte(walletMetadataBucket))
-		lastScannedBlock = walletMetadata.Get([]byte(lastScannedBlockKey))
+		bytes = walletMetadata.Get([]byte(lastScannedBlockKey))
 		return nil
 	})
+	lastScannedBlock := utils.BytesToInt64(bytes)
 	return lastScannedBlock
 }
 
@@ -162,6 +167,25 @@ func (w Wallet) getAcct0Ext() []byte {
 		return nil
 	})
 	return encryptedAcct0ext
+}
+
+func (w Wallet) getAllKeyPairs() ([]KeyPair, error) {
+	var keyPairs []KeyPair
+	err := w.db.View(func(tx *bolt.Tx) error {
+		keysb := tx.Bucket([]byte(keysBucket))
+
+		c := keysb.Cursor()
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			var kp KeyPair
+			if err := json.Unmarshal(v, &kp); err != nil {
+				return fmt.Errorf("error unmarshalling key pair: %v", err.Error())
+			}
+			keyPairs = append(keyPairs, kp)
+		}
+		return nil
+	})
+
+	return keyPairs, err
 }
 
 func (w Wallet) increaseLastExternalIdx() error {
