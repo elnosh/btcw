@@ -171,5 +171,10 @@ func LoadWallet(rpcuser, rpcpass string) (*Wallet, error) {
 	wallet.lastInternalIdx = wallet.getLastInternalIdx()
 	wallet.lastScannedBlock = wallet.getLastScannedBlock()
 
+	err = wallet.loadAddresses()
+	if err != nil {
+		return nil, err
+	}
+
 	return wallet, nil
 }
