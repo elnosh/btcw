@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/rpcclient"
 	bolt "go.etcd.io/bbolt"
@@ -150,12 +151,16 @@ func LoadWallet(rpcuser, rpcpass string) (*Wallet, error) {
 		return nil, ErrWalletNotExists
 	}
 
+	// TODO: handle difference between bitcoin core and btcd
+	certHomeDir := btcutil.AppDataDir("btcd", false)
+	certs, err := os.ReadFile(filepath.Join(certHomeDir, "rpc.cert"))
 	connCfg := &rpcclient.ConnConfig{
-		Host:         "localhost:18443",
+		Host:         "localhost:18556",
 		User:         rpcuser,
 		Pass:         rpcpass,
+		Certificates: certs,
 		HTTPPostMode: true,
-		DisableTLS:   true,
+		// DisableTLS:   true,
 	}
 
 	client, err := rpcclient.New(connCfg, nil)
@@ -163,7 +168,8 @@ func LoadWallet(rpcuser, rpcpass string) (*Wallet, error) {
 		return nil, fmt.Errorf("error setting up rpc client: %v", err)
 	}
 
-	wallet := &Wallet{db: db, client: client}
+	addresses := make(map[address]derivationPath)
+	wallet := &Wallet{db: db, client: client, addresses: addresses}
 
 	// TODO: utxos
 	wallet.balance = wallet.getBalance()

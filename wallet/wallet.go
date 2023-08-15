@@ -1,10 +1,16 @@
 package wallet
 
 import (
-	"encoding/json"
-	"errors"
+	"context"
+	"encoding/hex"
+	"fmt"
+	"log"
+	"time"
 
+	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/rpcclient"
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/elnosh/btcw/tx"
 	bolt "go.etcd.io/bbolt"
 )
@@ -18,7 +24,7 @@ type Wallet struct {
 	db     *bolt.DB
 	client *rpcclient.Client
 
-	utxos            []tx.UTXO
+	utxos            []*tx.UTXO
 	balance          int64
 	lastExternalIdx  uint32
 	lastInternalIdx  uint32
@@ -27,58 +33,130 @@ type Wallet struct {
 	addresses map[address]derivationPath
 }
 
-func (w *Wallet) GetBalance() int64 {
-	return w.balance
+func (w *Wallet) setLastExternalIdx(idx uint32) error {
+	err := w.updateLastExternalIdx(idx)
+	if err != nil {
+		return err
+	}
+	w.lastExternalIdx = idx
+	return nil
 }
 
-func (w *Wallet) GetNewAddress() (string, error) {
-	// get account_0_external
-	encryptedAcct0ext := w.getAcct0Ext()
-	if encryptedAcct0ext == nil {
-		return "", errors.New("account 0 external not found")
-	}
-
-	passKey, err := w.GetDecodedKey()
+func (w *Wallet) setLastScannedBlock(height int64) error {
+	err := w.updateLastScannedBlock(height)
 	if err != nil {
-		return "", err
+		return err
 	}
+	w.lastScannedBlock = height
+	return nil
+}
 
-	acct0ext, err := Decrypt(encryptedAcct0ext, passKey)
+func (w *Wallet) setBalance(balance int64) error {
+	err := w.updateBalanceDB(balance)
 	if err != nil {
-		return "", err
+		return err
 	}
+	w.balance = balance
+	return nil
+}
 
-	// derive the next key
-	newKey, err := DeriveNextExternalKey(acct0ext, w.lastExternalIdx+1)
+func (w *Wallet) addUTXO(utxo *tx.UTXO) error {
+	err := w.saveUTXO(utxo)
 	if err != nil {
-		return "", err
+		return err
 	}
+	w.utxos = append(w.utxos, utxo)
+	return nil
+}
 
-	// update lastExternalIdx value in db and wallet struct
-	w.lastExternalIdx += 1
-	err = w.increaseLastExternalIdx()
-	if err != nil {
-		return "", err
+func ScanForNewBlocks(ctx context.Context, wallet *Wallet, errChan chan error) {
+	go func(ctx context.Context) {
+		ticker := time.NewTicker(time.Second * 30)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				errChan <- nil
+				return
+			case <-ticker.C:
+				height, err := wallet.client.GetBlockCount()
+				if err != nil {
+					log.Printf("error getting block count: %s", err.Error())
+					errChan <- err
+					return
+				}
+				err = checkBlocks(wallet, height)
+				if err != nil {
+					fmt.Printf("error checking blocks: %s", err.Error())
+					errChan <- err
+					return
+				}
+			}
+		}
+	}(ctx)
+}
+
+// check for new blocks
+// it will look for UTXOs for addresses owned by wallet
+// if finds any, it will update wallet UTXOs, balance, last fields
+func checkBlocks(wallet *Wallet, height int64) error {
+	for wallet.lastScannedBlock < height {
+		// get hash of next block to scan
+		nextBlockHash, err := wallet.client.GetBlockHash(wallet.lastScannedBlock + 1)
+		if err != nil {
+			return fmt.Errorf("error getting block hash: %s", err.Error())
+		}
+		// get block info
+		block, err := wallet.client.GetBlockVerboseTx(nextBlockHash)
+		if err != nil {
+			return fmt.Errorf("error getting block: %s", err.Error())
+		}
+
+		txsInBlock := block.RawTx
+		for _, rawTx := range txsInBlock {
+			for _, vout := range rawTx.Vout {
+				scriptAsm, err := hex.DecodeString(vout.ScriptPubKey.Hex)
+				if err != nil {
+					return fmt.Errorf("error decoding hex script: %s", err.Error())
+				}
+
+				// this will extract the address from the script
+				class, addrs, _, err := txscript.ExtractPkScriptAddrs(scriptAsm, &chaincfg.SimNetParams)
+				if err != nil {
+					return fmt.Errorf("error extractring address script info: %s", err.Error())
+				}
+
+				// only handling pub key hash for now
+				if class == txscript.PubKeyHashTy {
+					// check if address extracted from script is in wallet
+					addr := addrs[0].String()
+					path, ok := wallet.addresses[addr]
+					// if match is found
+					// add UTXO and update wallet balance
+					if ok {
+						utxo := tx.NewUTXO(rawTx.Txid, vout.N, vout.Value, path)
+						if err := wallet.addUTXO(utxo); err != nil {
+							return fmt.Errorf("error adding new UTXO: %s", err.Error())
+						}
+
+						amt, err := btcutil.NewAmount(vout.Value)
+						if err != nil {
+							return fmt.Errorf("error getting tx amount: %s", err.Error())
+						}
+
+						balance := wallet.balance + int64(amt)
+						if err := wallet.setBalance(balance); err != nil {
+							return fmt.Errorf("error setting wallet balance: %s", err.Error())
+						}
+					}
+				}
+
+			}
+		}
+		// increase last scanned block
+		if err := wallet.setLastScannedBlock(wallet.lastScannedBlock + 1); err != nil {
+			return fmt.Errorf("error setting last scanned block: %s", err.Error())
+		}
 	}
-
-	// get new public/private key pair
-	// public key is serialized in compressed format
-	// private key is encrypted WIF
-	keyPair, err := NewKeyPair(newKey, passKey)
-	if err != nil {
-		return "", err
-	}
-
-	jsonKeyPair, err := json.Marshal(keyPair)
-	if err != nil {
-		return "", err
-	}
-
-	// save json encoding of key pair in db
-	err = w.saveExternalKeyPair(jsonKeyPair)
-	if err != nil {
-		return "", err
-	}
-
-	return keyPair.Address, nil
+	return nil
 }

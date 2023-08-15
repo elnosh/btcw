@@ -171,14 +171,26 @@ func (w Wallet) getAcct0Ext() []byte {
 	return encryptedAcct0ext
 }
 
-func (w *Wallet) saveLastExternalIdx(idx uint32) error {
+func (w *Wallet) updateLastExternalIdx(idx uint32) error {
 	if err := w.db.Update(func(tx *bolt.Tx) error {
 		walletMetadata := tx.Bucket([]byte(walletMetadataBucket))
 		newIdx := utils.Uint32ToBytes(idx)
 		err := walletMetadata.Put([]byte(lastExternalIdxKey), newIdx)
 		return err
 	}); err != nil {
-		return fmt.Errorf("error saving last external idx: %s", err.Error())
+		return fmt.Errorf("error updating last external idx: %s", err.Error())
+	}
+	return nil
+}
+
+func (w *Wallet) updateLastScannedBlock(height int64) error {
+	if err := w.db.Update(func(tx *bolt.Tx) error {
+		walletMetadata := tx.Bucket([]byte(walletMetadataBucket))
+		v := utils.Int64ToBytes(height)
+		err := walletMetadata.Put([]byte(lastScannedBlockKey), v)
+		return err
+	}); err != nil {
+		return fmt.Errorf("error updating last scanned block: %s", err.Error())
 	}
 	return nil
 }
@@ -232,7 +244,7 @@ func (w *Wallet) updateBalanceDB(balance int64) error {
 }
 
 func (w *Wallet) loadAddresses() error {
-	return w.db.View(func(tx *bolt.Tx) error {
+	if err := w.db.View(func(tx *bolt.Tx) error {
 		keysb := tx.Bucket([]byte(keysBucket))
 
 		c := keysb.Cursor()
@@ -244,5 +256,8 @@ func (w *Wallet) loadAddresses() error {
 			w.addresses[kp.Address] = string(k)
 		}
 		return nil
-	})
+	}); err != nil {
+		return err
+	}
+	return nil
 }

@@ -15,7 +15,7 @@ func StartRPCServer(wallet *wallet.Wallet) error {
 
 	listener, err := net.Listen("tcp", ":18557")
 	if err != nil {
-		return err
+		return fmt.Errorf("error starting RPC server: %s", err.Error())
 	}
 
 	fmt.Printf("rpc server listening on: %v\n", listener.Addr())
