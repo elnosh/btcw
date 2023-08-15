@@ -171,13 +171,17 @@ func LoadWallet(rpcuser, rpcpass string) (*Wallet, error) {
 	addresses := make(map[address]derivationPath)
 	wallet := &Wallet{db: db, client: client, addresses: addresses}
 
-	// TODO: utxos
 	wallet.balance = wallet.getBalance()
 	wallet.lastExternalIdx = wallet.getLastExternalIdx()
 	wallet.lastInternalIdx = wallet.getLastInternalIdx()
 	wallet.lastScannedBlock = wallet.getLastScannedBlock()
 
 	err = wallet.loadAddresses()
+	if err != nil {
+		return nil, err
+	}
+
+	err = wallet.loadUTXOs()
 	if err != nil {
 		return nil, err
 	}

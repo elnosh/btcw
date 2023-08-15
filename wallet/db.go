@@ -243,6 +243,28 @@ func (w *Wallet) updateBalanceDB(balance int64) error {
 	return nil
 }
 
+func (w *Wallet) loadUTXOs() error {
+	utxos := make([]tx.UTXO, 0, 100)
+
+	if err := w.db.View(func(dbtx *bolt.Tx) error {
+		utxosb := dbtx.Bucket([]byte(utxosBucket))
+
+		c := utxosb.Cursor()
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			var utxo tx.UTXO
+			if err := json.Unmarshal(v, &utxo); err != nil {
+				return fmt.Errorf("error loading UTXOs: %s", err.Error())
+			}
+			utxos = append(utxos, utxo)
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	w.utxos = utxos
+	return nil
+}
+
 func (w *Wallet) loadAddresses() error {
 	if err := w.db.View(func(tx *bolt.Tx) error {
 		keysb := tx.Bucket([]byte(keysBucket))
@@ -251,7 +273,7 @@ func (w *Wallet) loadAddresses() error {
 		for k, v := c.First(); k != nil; k, v = c.Next() {
 			var kp KeyPair
 			if err := json.Unmarshal(v, &kp); err != nil {
-				return fmt.Errorf("error loading addresses: %v", err.Error())
+				return fmt.Errorf("error loading addresses: %s", err.Error())
 			}
 			w.addresses[kp.Address] = string(k)
 		}

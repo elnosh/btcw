@@ -24,7 +24,7 @@ type Wallet struct {
 	db     *bolt.DB
 	client *rpcclient.Client
 
-	utxos            []*tx.UTXO
+	utxos            []tx.UTXO
 	balance          int64
 	lastExternalIdx  uint32
 	lastInternalIdx  uint32
@@ -65,7 +65,7 @@ func (w *Wallet) addUTXO(utxo *tx.UTXO) error {
 	if err != nil {
 		return err
 	}
-	w.utxos = append(w.utxos, utxo)
+	w.utxos = append(w.utxos, *utxo)
 	return nil
 }
 
@@ -100,6 +100,7 @@ func ScanForNewBlocks(ctx context.Context, wallet *Wallet, errChan chan error) {
 // it will look for UTXOs for addresses owned by wallet
 // if finds any, it will update wallet UTXOs, balance, last fields
 func checkBlocks(wallet *Wallet, height int64) error {
+	fmt.Println("scanning")
 	for wallet.lastScannedBlock < height {
 		// get hash of next block to scan
 		nextBlockHash, err := wallet.client.GetBlockHash(wallet.lastScannedBlock + 1)
