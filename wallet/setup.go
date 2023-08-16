@@ -59,10 +59,6 @@ func CreateWallet() error {
 		os.Exit(0)
 	}
 
-	if err = wallet.InitAuthBucket(encodedHash); err != nil {
-		return err
-	}
-
 	seed, err := hdkeychain.GenerateSeed(hdkeychain.RecommendedSeedLen)
 	if err != nil {
 		return err
@@ -71,15 +67,7 @@ func CreateWallet() error {
 	fmt.Println("Next will be the master seed. Write it down and store securely. Anyone with access to the seed has access to the funds.")
 	fmt.Printf("seed: %x\n", seed)
 
-	if err = wallet.InitWalletMetadataBucket(seed, encodedHash); err != nil {
-		return err
-	}
-
-	if err = wallet.InitUTXOBucket(); err != nil {
-		return err
-	}
-
-	if err = wallet.InitKeysBucket(); err != nil {
+	if err = wallet.InitWalletBuckets(seed, encodedHash); err != nil {
 		return err
 	}
 

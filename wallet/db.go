@@ -28,83 +28,95 @@ const (
 	lastInternalIdxKey  = "last_internal_idx"
 )
 
-// init bucket with hashed passphrase
-func (w *Wallet) InitAuthBucket(encodedHash string) error {
+// initialize all wallet buckets, internally to init auth, uxto and so on buckets
+func (w *Wallet) InitWalletBuckets(seed []byte, encodedHash string) error {
 	return w.db.Update(func(tx *bolt.Tx) error {
-		b, err := tx.CreateBucket([]byte(authBucket))
+		if err := createAuthBucket(tx, encodedHash); err != nil {
+			return err
+		}
+		if err := createUTXOBucket(tx); err != nil {
+			return err
+		}
+		if err := createKeysBucket(tx); err != nil {
+			return err
+		}
+
+		// derive keys to be stored
+		master, acct0ext, acct0int, err := DeriveHDKeys(seed, encodedHash)
 		if err != nil {
 			return err
 		}
-		return b.Put([]byte(encodedHashKey), []byte(encodedHash))
-	})
-}
 
-func (w *Wallet) InitUTXOBucket() error {
-	return w.db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucket([]byte(utxosBucket))
+		// decoded hash to get passkey
+		_, key, _, err := DecodeHash(encodedHash)
 		if err != nil {
+			return err
+		}
+
+		// encrypt derived keys
+		encryptedMaster, encryptedAcct0ext, encryptedAcct0int, err := EncryptHDKeys(key, master, acct0ext, acct0int)
+		if err != nil {
+			return err
+		}
+
+		if err := createWalletMetadataBucket(tx, encryptedMaster, encryptedAcct0ext, encryptedAcct0int); err != nil {
 			return err
 		}
 		return nil
 	})
 }
 
-func (w *Wallet) InitKeysBucket() error {
-	return w.db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucket([]byte(keysBucket))
-		if err != nil {
-			return err
-		}
-		return nil
-	})
+// create bucket with hashed passphrase
+func createAuthBucket(tx *bolt.Tx, encodedHash string) error {
+	b, err := tx.CreateBucket([]byte(authBucket))
+	if err != nil {
+		return err
+	}
+	return b.Put([]byte(encodedHashKey), []byte(encodedHash))
 }
 
-func (w *Wallet) InitWalletMetadataBucket(seed []byte, encodedHash string) error {
-	master, acct0ext, acct0int, err := DeriveHDKeys(seed, encodedHash)
+func createUTXOBucket(tx *bolt.Tx) error {
+	_, err := tx.CreateBucket([]byte(utxosBucket))
+	return err
+}
+
+func createKeysBucket(tx *bolt.Tx) error {
+	_, err := tx.CreateBucket([]byte(keysBucket))
+	return err
+}
+
+func createWalletMetadataBucket(tx *bolt.Tx, encryptedMaster, encryptedAcct0ext, encryptedAcct0int []byte) error {
+	wallet, err := tx.CreateBucket([]byte(walletMetadataBucket))
 	if err != nil {
 		return err
 	}
 
-	_, key, _, err := DecodeHash(encodedHash)
-	if err != nil {
+	if err = wallet.Put([]byte(balanceKey), utils.Int64ToBytes(0)); err != nil {
 		return err
 	}
 
-	encryptedMaster, encryptedAcct0ext, encryptedAcct0int, err := EncryptHDKeys(key, master, acct0ext, acct0int)
+	if err = wallet.Put([]byte(lastScannedBlockKey), utils.Int64ToBytes(0)); err != nil {
+		return err
+	}
 
-	return w.db.Update(func(tx *bolt.Tx) error {
-		wallet, err := tx.CreateBucket([]byte(walletMetadataBucket))
-		if err != nil {
-			return err
-		}
+	// set derivation paths needed
+	if err = wallet.Put([]byte(masterSeedKey), encryptedMaster); err != nil {
+		return err
+	}
+	if err = wallet.Put([]byte(account0ExternelKey), encryptedAcct0ext); err != nil {
+		return err
+	}
+	if err = wallet.Put([]byte(account0InternalKey), encryptedAcct0int); err != nil {
+		return err
+	}
+	if err = wallet.Put([]byte(lastExternalIdxKey), utils.Uint32ToBytes(0)); err != nil {
+		return err
+	}
+	if err = wallet.Put([]byte(lastInternalIdxKey), utils.Uint32ToBytes(0)); err != nil {
+		return err
+	}
 
-		if err = wallet.Put([]byte(balanceKey), utils.Int64ToBytes(0)); err != nil {
-			return err
-		}
-
-		if err = wallet.Put([]byte(lastScannedBlockKey), utils.Int64ToBytes(0)); err != nil {
-			return err
-		}
-
-		// set derivation paths needed
-		if err = wallet.Put([]byte(masterSeedKey), encryptedMaster); err != nil {
-			return err
-		}
-		if err = wallet.Put([]byte(account0ExternelKey), encryptedAcct0ext); err != nil {
-			return err
-		}
-		if err = wallet.Put([]byte(account0InternalKey), encryptedAcct0int); err != nil {
-			return err
-		}
-		if err = wallet.Put([]byte(lastExternalIdxKey), utils.Uint32ToBytes(0)); err != nil {
-			return err
-		}
-		if err = wallet.Put([]byte(lastInternalIdxKey), utils.Uint32ToBytes(0)); err != nil {
-			return err
-		}
-
-		return nil
-	})
+	return nil
 }
 
 func (w Wallet) getEncodedHash() []byte {

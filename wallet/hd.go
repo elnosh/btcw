@@ -62,17 +62,17 @@ func EncryptHDKeys(key []byte, master, acct0ext, acct0int *hdkeychain.ExtendedKe
 	encryptedAcct0ext, encryptedAcct0int []byte, err error) {
 	encryptedMaster, err = Encrypt([]byte(master.String()), key)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, fmt.Errorf("error encrypting key: %s", err.Error())
 	}
 
 	encryptedAcct0ext, err = Encrypt([]byte(acct0ext.String()), key)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, fmt.Errorf("error encrypting key: %s", err.Error())
 	}
 
 	encryptedAcct0int, err = Encrypt([]byte(acct0int.String()), key)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, fmt.Errorf("error encrypting key: %s", err.Error())
 	}
 
 	return encryptedMaster, encryptedAcct0ext, encryptedAcct0int, nil
