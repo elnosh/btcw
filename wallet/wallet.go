@@ -25,7 +25,7 @@ type Wallet struct {
 	client *rpcclient.Client
 
 	utxos            []tx.UTXO
-	balance          int64
+	balance          btcutil.Amount
 	lastExternalIdx  uint32
 	lastInternalIdx  uint32
 	lastScannedBlock int64
@@ -51,7 +51,7 @@ func (w *Wallet) setLastScannedBlock(height int64) error {
 	return nil
 }
 
-func (w *Wallet) setBalance(balance int64) error {
+func (w *Wallet) setBalance(balance btcutil.Amount) error {
 	err := w.updateBalanceDB(balance)
 	if err != nil {
 		return err
@@ -100,7 +100,6 @@ func ScanForNewBlocks(ctx context.Context, wallet *Wallet, errChan chan error) {
 // it will look for UTXOs for addresses owned by wallet
 // if finds any, it will update wallet UTXOs, balance, last fields
 func checkBlocks(wallet *Wallet, height int64) error {
-	fmt.Println("scanning")
 	for wallet.lastScannedBlock < height {
 		// get hash of next block to scan
 		nextBlockHash, err := wallet.client.GetBlockHash(wallet.lastScannedBlock + 1)
@@ -145,7 +144,7 @@ func checkBlocks(wallet *Wallet, height int64) error {
 							return fmt.Errorf("error getting tx amount: %s", err.Error())
 						}
 
-						balance := wallet.balance + int64(amt)
+						balance := wallet.balance + amt
 						if err := wallet.setBalance(balance); err != nil {
 							return fmt.Errorf("error setting wallet balance: %s", err.Error())
 						}

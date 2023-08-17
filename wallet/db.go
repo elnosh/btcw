@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/elnosh/btcw/tx"
 	"github.com/elnosh/btcw/utils"
 	bolt "go.etcd.io/bbolt"
@@ -28,7 +29,7 @@ const (
 	lastInternalIdxKey  = "last_internal_idx"
 )
 
-// initialize all wallet buckets, internally to init auth, uxto and so on buckets
+// create auth, utxos, keys and wallet metadata buckets
 func (w *Wallet) InitWalletBuckets(seed []byte, encodedHash string) error {
 	return w.db.Update(func(tx *bolt.Tx) error {
 		if err := createAuthBucket(tx, encodedHash); err != nil {
@@ -129,14 +130,14 @@ func (w Wallet) getEncodedHash() []byte {
 	return encodedHash
 }
 
-func (w Wallet) getBalance() int64 {
+func (w Wallet) getBalance() btcutil.Amount {
 	var bytes []byte
 	w.db.View(func(tx *bolt.Tx) error {
 		walletMetadata := tx.Bucket([]byte(walletMetadataBucket))
 		bytes = walletMetadata.Get([]byte(balanceKey))
 		return nil
 	})
-	balance := utils.BytesToInt64(bytes)
+	balance := btcutil.Amount(utils.BytesToInt64(bytes))
 	return balance
 }
 
@@ -242,8 +243,8 @@ func (w *Wallet) saveUTXO(utxo *tx.UTXO) error {
 	return nil
 }
 
-func (w *Wallet) updateBalanceDB(balance int64) error {
-	balancebytes := utils.Int64ToBytes(balance)
+func (w *Wallet) updateBalanceDB(balance btcutil.Amount) error {
+	balancebytes := utils.Int64ToBytes(int64(balance))
 
 	if err := w.db.Update(func(tx *bolt.Tx) error {
 		walletMetadata := tx.Bucket([]byte(walletMetadataBucket))

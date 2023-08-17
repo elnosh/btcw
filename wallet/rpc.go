@@ -1,9 +1,11 @@
 package wallet
 
-import "errors"
+import (
+	"errors"
+)
 
 func (w *Wallet) GetBalance() int64 {
-	return w.balance
+	return int64(w.balance)
 }
 
 func (w *Wallet) GetNewAddress() (string, error) {
