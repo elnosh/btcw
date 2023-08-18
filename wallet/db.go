@@ -174,7 +174,7 @@ func (w Wallet) getLastScannedBlock() int64 {
 	return lastScannedBlock
 }
 
-func (w Wallet) getAcct0Ext() []byte {
+func (w Wallet) getAcct0External() []byte {
 	var encryptedAcct0ext []byte
 	w.db.View(func(tx *bolt.Tx) error {
 		walletMetadata := tx.Bucket([]byte(walletMetadataBucket))
@@ -182,6 +182,16 @@ func (w Wallet) getAcct0Ext() []byte {
 		return nil
 	})
 	return encryptedAcct0ext
+}
+
+func (w Wallet) getAcct0Internal() []byte {
+	var encryptedAcct0internal []byte
+	w.db.View(func(tx *bolt.Tx) error {
+		walletMetadata := tx.Bucket([]byte(walletMetadataBucket))
+		encryptedAcct0internal = walletMetadata.Get([]byte(account0InternalKey))
+		return nil
+	})
+	return encryptedAcct0internal
 }
 
 func (w *Wallet) updateLastExternalIdx(idx uint32) error {
@@ -192,6 +202,18 @@ func (w *Wallet) updateLastExternalIdx(idx uint32) error {
 		return err
 	}); err != nil {
 		return fmt.Errorf("error updating last external idx: %s", err.Error())
+	}
+	return nil
+}
+
+func (w *Wallet) updateLastInternalIdx(idx uint32) error {
+	if err := w.db.Update(func(tx *bolt.Tx) error {
+		walletMetadata := tx.Bucket([]byte(walletMetadataBucket))
+		newIdx := utils.Uint32ToBytes(idx)
+		err := walletMetadata.Put([]byte(lastInternalIdxKey), newIdx)
+		return err
+	}); err != nil {
+		return fmt.Errorf("error updating last internal idx: %s", err.Error())
 	}
 	return nil
 }

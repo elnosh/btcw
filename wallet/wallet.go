@@ -42,6 +42,15 @@ func (w *Wallet) setLastExternalIdx(idx uint32) error {
 	return nil
 }
 
+func (w *Wallet) setLastInternalIdx(idx uint32) error {
+	err := w.updateLastInternalIdx(idx)
+	if err != nil {
+		return err
+	}
+	w.lastInternalIdx = idx
+	return nil
+}
+
 func (w *Wallet) setLastScannedBlock(height int64) error {
 	err := w.updateLastScannedBlock(height)
 	if err != nil {

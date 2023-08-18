@@ -2,19 +2,26 @@ package wallet
 
 import (
 	"errors"
+
+	"github.com/btcsuite/btcd/btcutil"
 )
 
-func (w *Wallet) GetBalance() int64 {
-	return int64(w.balance)
+var (
+	ErrInsufficientFunds = errors.New("insufficient funds to make transaction")
+)
+
+func (w *Wallet) GetBalance() btcutil.Amount {
+	return w.balance
 }
 
 func (w *Wallet) GetNewAddress() (string, error) {
 	// get account_0_external
-	encryptedAcct0ext := w.getAcct0Ext()
+	encryptedAcct0ext := w.getAcct0External()
 	if encryptedAcct0ext == nil {
 		return "", errors.New("account 0 external not found")
 	}
 
+	// key to decrypt extended key
 	passKey, err := w.GetDecodedKey()
 	if err != nil {
 		return "", err
@@ -25,8 +32,8 @@ func (w *Wallet) GetNewAddress() (string, error) {
 		return "", err
 	}
 
-	// derive the next key
-	newKey, err := DeriveNextExternalKey(acct0ext, w.lastExternalIdx+1)
+	// derive the next external key
+	newKey, err := DeriveNextKey(acct0ext, w.lastExternalIdx+1)
 	if err != nil {
 		return "", err
 	}

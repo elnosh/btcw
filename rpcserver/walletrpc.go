@@ -7,7 +7,7 @@ type WalletRPC struct {
 }
 
 func (w *WalletRPC) GetBalance(args struct{}, reply *int64) error {
-	*reply = w.wallet.GetBalance()
+	*reply = int64(w.wallet.GetBalance())
 	return nil
 }
 

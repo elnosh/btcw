@@ -78,14 +78,14 @@ func EncryptHDKeys(key []byte, master, acct0ext, acct0int *hdkeychain.ExtendedKe
 	return encryptedMaster, encryptedAcct0ext, encryptedAcct0int, nil
 }
 
-// from account_0_external, derive next key
-func DeriveNextExternalKey(acct0ext []byte, idx uint32) (*hdkeychain.ExtendedKey, error) {
-	acct0extKey, err := hdkeychain.NewKeyFromString(string(acct0ext))
+// fromAcctKey could be either external or internal, derive next external key
+func DeriveNextKey(fromAcctKey []byte, idx uint32) (*hdkeychain.ExtendedKey, error) {
+	acctExtendedKey, err := hdkeychain.NewKeyFromString(string(fromAcctKey))
 	if err != nil {
 		return nil, fmt.Errorf("error deriving new key: %v", err)
 	}
 
-	newKey, err := acct0extKey.Derive(idx)
+	newKey, err := acctExtendedKey.Derive(idx)
 	if err != nil {
 		return nil, fmt.Errorf("error deriving new key: %v", err)
 	}

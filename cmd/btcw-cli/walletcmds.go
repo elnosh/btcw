@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/rpc/jsonrpc"
 
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/urfave/cli/v2"
 )
 
@@ -26,7 +27,8 @@ func getBalance(ctx *cli.Context) error {
 		return err
 	}
 
-	fmt.Printf("balance: %v sats\n", *reply)
+	sats := btcutil.Amount(*reply)
+	fmt.Printf("balance: %v BTC\n", sats.ToBTC())
 	return nil
 }
 
