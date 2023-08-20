@@ -120,7 +120,7 @@ func (w *Wallet) generateNewInternalKeyPair() (*KeyPair, error) {
 
 	// update lastExternalIdx value in db and wallet struct
 	newIdx := w.lastInternalIdx + 1
-	err = w.setLastExternalIdx(newIdx)
+	err = w.setLastInternalIdx(newIdx)
 	if err != nil {
 		return nil, err
 	}

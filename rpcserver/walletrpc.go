@@ -20,3 +20,18 @@ func (w *WalletRPC) GetNewAddress(args struct{}, reply *string) error {
 	*reply = address
 	return nil
 }
+
+type SendToArgs struct {
+	Address string
+	Amount  float64
+}
+
+func (w *WalletRPC) SendToAddress(args SendToArgs, reply *string) error {
+	txHash, err := w.wallet.SendToAddress(args.Address, args.Amount)
+	if err != nil {
+		return err
+	}
+
+	*reply = txHash
+	return nil
+}

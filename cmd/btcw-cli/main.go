@@ -14,6 +14,7 @@ func main() {
 		Commands: []*cli.Command{
 			getBalanceCmd,
 			getNewAddressCmd,
+			sendToAddressCmd,
 		},
 	}
 
