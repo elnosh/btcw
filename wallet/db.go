@@ -3,6 +3,7 @@ package wallet
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"strconv"
 
 	"github.com/btcsuite/btcd/btcutil"
@@ -230,7 +231,7 @@ func (w *Wallet) updateLastScannedBlock(height int64) error {
 	return nil
 }
 
-func (w *Wallet) saveExternalKeyPair(keypair *KeyPair) error {
+func (w *Wallet) saveKeyPair(derivationPath string, keypair *KeyPair) error {
 	jsonbytes, err := json.Marshal(keypair)
 	if err != nil {
 		return fmt.Errorf("error marshalling key pair: %s", err.Error())
@@ -238,11 +239,60 @@ func (w *Wallet) saveExternalKeyPair(keypair *KeyPair) error {
 
 	if err := w.db.Update(func(tx *bolt.Tx) error {
 		keysb := tx.Bucket([]byte(keysBucket))
-		derivationPath := fmt.Sprintf("m/44'/1'/0'/0/%d", w.lastExternalIdx)
 		err := keysb.Put([]byte(derivationPath), jsonbytes)
 		return err
 	}); err != nil {
-		return fmt.Errorf("error saving external key pair: %s", err.Error())
+		return fmt.Errorf("error saving key pair: %s", err.Error())
+	}
+	return nil
+}
+
+func (w *Wallet) getKeyPair(derivationPath string) *KeyPair {
+	keyPair := &KeyPair{}
+
+	if err := w.db.View(func(tx *bolt.Tx) error {
+		keysb := tx.Bucket([]byte(keysBucket))
+		keyPairBytes := keysb.Get([]byte(derivationPath))
+		err := json.Unmarshal(keyPairBytes, keyPair)
+		if err != nil {
+			log.Println(err.Error())
+		}
+		return err
+	}); err != nil {
+		return nil
+	}
+
+	return keyPair
+}
+
+func (w *Wallet) loadAddresses() error {
+	if err := w.db.View(func(tx *bolt.Tx) error {
+		keysb := tx.Bucket([]byte(keysBucket))
+
+		c := keysb.Cursor()
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			var kp KeyPair
+			if err := json.Unmarshal(v, &kp); err != nil {
+				return fmt.Errorf("error loading addresses: %s", err.Error())
+			}
+			w.addresses[kp.Address] = string(k)
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (w *Wallet) updateBalanceDB(balance btcutil.Amount) error {
+	balancebytes := utils.Int64ToBytes(int64(balance))
+
+	if err := w.db.Update(func(tx *bolt.Tx) error {
+		walletMetadata := tx.Bucket([]byte(walletMetadataBucket))
+		err := walletMetadata.Put([]byte(balanceKey), balancebytes)
+		return err
+	}); err != nil {
+		return fmt.Errorf("error updating balance: %s", err.Error())
 	}
 	return nil
 }
@@ -261,19 +311,6 @@ func (w *Wallet) saveUTXO(utxo *tx.UTXO) error {
 		return err
 	}); err != nil {
 		return fmt.Errorf("error saving utxo: %s", err.Error())
-	}
-	return nil
-}
-
-func (w *Wallet) updateBalanceDB(balance btcutil.Amount) error {
-	balancebytes := utils.Int64ToBytes(int64(balance))
-
-	if err := w.db.Update(func(tx *bolt.Tx) error {
-		walletMetadata := tx.Bucket([]byte(walletMetadataBucket))
-		err := walletMetadata.Put([]byte(balanceKey), balancebytes)
-		return err
-	}); err != nil {
-		return fmt.Errorf("error updating balance: %s", err.Error())
 	}
 	return nil
 }
@@ -297,24 +334,5 @@ func (w *Wallet) loadUTXOs() error {
 		return err
 	}
 	w.utxos = utxos
-	return nil
-}
-
-func (w *Wallet) loadAddresses() error {
-	if err := w.db.View(func(tx *bolt.Tx) error {
-		keysb := tx.Bucket([]byte(keysBucket))
-
-		c := keysb.Cursor()
-		for k, v := c.First(); k != nil; k, v = c.Next() {
-			var kp KeyPair
-			if err := json.Unmarshal(v, &kp); err != nil {
-				return fmt.Errorf("error loading addresses: %s", err.Error())
-			}
-			w.addresses[kp.Address] = string(k)
-		}
-		return nil
-	}); err != nil {
-		return err
-	}
 	return nil
 }

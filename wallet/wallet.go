@@ -3,6 +3,7 @@ package wallet
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -18,6 +19,12 @@ import (
 type (
 	address        = string
 	derivationPath = string
+	Chain          int
+)
+
+const (
+	externalChain Chain = iota
+	internalChain
 )
 
 type Wallet struct {
@@ -31,6 +38,33 @@ type Wallet struct {
 	lastScannedBlock int64
 
 	addresses map[address]derivationPath
+}
+
+// getDecryptedAccountKey will take a Chain which can be either external
+// or internal and return a decrypted chain key
+func (w *Wallet) getDecryptedAccountKey(chain Chain) ([]byte, error) {
+	var encryptedChainKey []byte
+
+	switch chain {
+	case externalChain:
+		encryptedChainKey = w.getAcct0External()
+	case internalChain:
+		encryptedChainKey = w.getAcct0Internal()
+	default:
+		return nil, errors.New("invalid chain value")
+	}
+
+	passKey, err := w.GetDecodedKey()
+	if err != nil {
+		return nil, err
+	}
+
+	decryptedChainKey, err := Decrypt(encryptedChainKey, passKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return decryptedChainKey, nil
 }
 
 func (w *Wallet) setLastExternalIdx(idx uint32) error {
@@ -143,7 +177,7 @@ func checkBlocks(wallet *Wallet, height int64) error {
 					// if match is found
 					// add UTXO and update wallet balance
 					if ok {
-						utxo := tx.NewUTXO(rawTx.Txid, vout.N, vout.Value, path)
+						utxo := tx.NewUTXO(rawTx.Txid, vout.N, vout.Value, vout.ScriptPubKey.Hex, path)
 						if err := wallet.addUTXO(utxo); err != nil {
 							return fmt.Errorf("error adding new UTXO: %s", err.Error())
 						}
