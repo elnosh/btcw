@@ -7,7 +7,6 @@ import (
 	"math/rand"
 
 	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
@@ -32,12 +31,12 @@ func (w *Wallet) GetNewAddress() (string, error) {
 }
 
 func (w *Wallet) SendToAddress(address string, amount float64) (string, error) {
-	satsAmount, err := btcutil.NewAmount(amount)
+	amountToSend, err := btcutil.NewAmount(amount)
 	if err != nil {
 		return "", fmt.Errorf("invalid amount")
 	}
 
-	if w.balance < satsAmount {
+	if w.balance < amountToSend {
 		return "", ErrInsufficientFunds
 	}
 
@@ -53,34 +52,29 @@ func (w *Wallet) SendToAddress(address string, amount float64) (string, error) {
 	// need selected utxos to then use the derivation path
 	// to get the private key to sign tx
 	selectedUtxos := []tx.UTXO{}
-	var currentAmount float64
+	var currentAmount btcutil.Amount
 
-	// build tx output with the script and the amount (wanting to be sent)
-	addr, err := btcutil.DecodeAddress(address, &chaincfg.SimNetParams)
-	if err != nil {
-		return "", fmt.Errorf("invalid address")
-	}
-	script, err := txscript.PayToAddrScript(addr)
+	// add output to the tx with the script paying to address
+	// and the amount
+	txOut, err := tx.CreateTxOut(address, amountToSend)
 	if err != nil {
 		return "", err
 	}
-	tx := wire.NewMsgTx(wire.TxVersion)
-	txOut := wire.NewTxOut(int64(satsAmount), script)
-	tx.AddTxOut(txOut)
+	txToSend := wire.NewMsgTx(wire.TxVersion)
+	txToSend.AddTxOut(txOut)
 
 	// build wire.MsgTx with randomly selected utxos as inputs
 	for {
-		max := len(w.utxos) - 1
-
 		// TODO: change to crypto rand
+		// randomly select utxo
+		max := len(w.utxos) - 1
 		idx := rand.Intn(max)
 		utxo := walletUtxos[idx]
 		selectedUtxos = append(selectedUtxos, utxo)
 
 		// delete utxo selected from copy (walletUtxos) so that if random generator
 		// generates same number, same utxo won't be selected
-		walletUtxos[idx] = walletUtxos[len(walletUtxos)-1]
-		walletUtxos = walletUtxos[:len(walletUtxos)-1]
+		tx.DeleteUTXO(walletUtxos, idx)
 
 		prevTxHash, err := chainhash.NewHashFromStr(utxo.TxID)
 		if err != nil {
@@ -89,86 +83,58 @@ func (w *Wallet) SendToAddress(address string, amount float64) (string, error) {
 
 		prevOut := wire.NewOutPoint(prevTxHash, utxo.VoutIdx)
 		txIn := wire.NewTxIn(prevOut, nil, nil)
-		tx.AddTxIn(txIn)
+		txToSend.AddTxIn(txIn)
 
 		currentAmount += utxo.Value
 
 		// if already got value from utxos in wallet to satisfy amount
 		// then calculate fee and change output before break
-		if currentAmount > amount {
-			changeAmount := currentAmount - amount
+		if currentAmount > amountToSend {
+			changeAmount := currentAmount - amountToSend
+			//satsChangeAmount, _ := btcutil.NewAmount(changeAmount)
 
 			newKeyPair, err := w.generateNewInternalKeyPair()
 			if err != nil {
 				return "", err
 			}
 
-			changeAddr, err := btcutil.DecodeAddress(newKeyPair.Address, &chaincfg.SimNetParams)
-			if err != nil {
-				return "", fmt.Errorf("error decoding address: %s", err.Error())
-			}
-			changeOutputScript, err := txscript.PayToAddrScript(changeAddr)
+			// add change output to transaction
+			changeTxOut, err := tx.CreateTxOut(newKeyPair.Address, changeAmount)
 			if err != nil {
 				return "", err
 			}
+			txToSend.AddTxOut(changeTxOut)
 
-			satsChangeAmount, err := btcutil.NewAmount(changeAmount)
-			if err != nil {
-				return "", err
-			}
-
-			changeTxOut := wire.NewTxOut(int64(satsChangeAmount), changeOutputScript)
-			tx.AddTxOut(changeTxOut)
-
-			// calculate estimate of total fee for the tx
-			size := tx.SerializeSize()
-			// or float64(size) / float64(1000)
-			kbSize := float64(size / 1000)
+			// calculate estimate total fee for the tx
+			size := txToSend.SerializeSize()
+			kbSize := float64(size) / float64(1000)
 			estimateFee := fee * kbSize * 1.25
 
-			feeAmount, err := btcutil.NewAmount(estimateFee)
-			if err != nil {
-				return "", err
-			}
+			feeAmount, _ := btcutil.NewAmount(estimateFee)
 
-			// need another check after adding fee and that there are enough funds in wallet
 			// subtract fee from change
-			tx.TxOut[len(tx.TxOut)-1].Value -= int64(feeAmount)
+			txToSend.TxOut[len(txToSend.TxOut)-1].Value -= int64(feeAmount)
 			break
 		}
 	}
 
-	// at this point, msg.tx must have all inputs and ouputs (including change output)
+	// at this point, txToSend must have all inputs and ouputs (including change output)
 	// loop through the tx inputs, with derivation path for each selected utxo, get private key
 	// and sign input at current idx with the private key
-	for i, txin := range tx.TxIn {
-		derivationPath := selectedUtxos[i].DerivationPath
-		kp := w.getKeyPair(derivationPath)
-		if kp == nil {
-			return "", fmt.Errorf("error signing transaction")
-		}
+	for i, txin := range txToSend.TxIn {
+		utxo := selectedUtxos[i]
 
-		passKey, err := w.GetDecodedKey()
+		wif, err := w.getPrivateKeyForUTXO(utxo)
 		if err != nil {
 			return "", err
 		}
 
-		wifStr, err := Decrypt(kp.EncryptedPrivateKey, passKey)
-		if err != nil {
-			return "", err
-		}
-
-		wif, err := btcutil.DecodeWIF(string(wifStr))
-		if err != nil {
-			return "", fmt.Errorf("error decoding wif: %s", err.Error())
-		}
-
-		prevScript, err := hex.DecodeString(selectedUtxos[i].ScriptPubKey)
+		prevScript, err := hex.DecodeString(utxo.ScriptPubKey)
 		if err != nil {
 			return "", fmt.Errorf("error decoding scriptPubKey hex: %s", err.Error())
 		}
 
-		scripSig, err := txscript.SignatureScript(tx, i, prevScript, txscript.SigHashAll, wif.PrivKey, wif.CompressPubKey)
+		scripSig, err := txscript.SignatureScript(txToSend, i, prevScript, txscript.SigHashAll, wif.PrivKey, wif.CompressPubKey)
 		if err != nil {
 			return "", err
 		}
@@ -176,18 +142,14 @@ func (w *Wallet) SendToAddress(address string, amount float64) (string, error) {
 		txin.SignatureScript = scripSig
 	}
 
-	for i := range tx.TxIn {
+	for i := range txToSend.TxIn {
 		utxo := selectedUtxos[i]
 		prevScript, err := hex.DecodeString(utxo.ScriptPubKey)
 		if err != nil {
 			return "", fmt.Errorf("error decoding scriptPubKey hex: %s", err.Error())
 		}
-		amount, err := btcutil.NewAmount(utxo.Value)
-		if err != nil {
-			return "", err
-		}
 
-		vm, err := txscript.NewEngine(prevScript, tx, i, txscript.StandardVerifyFlags, nil, nil, int64(amount), nil)
+		vm, err := txscript.NewEngine(prevScript, txToSend, i, txscript.StandardVerifyFlags, nil, nil, int64(utxo.Value), nil)
 		if err != nil {
 			return "", err
 		}
@@ -198,10 +160,10 @@ func (w *Wallet) SendToAddress(address string, amount float64) (string, error) {
 		}
 	}
 
-	_, err = w.client.SendRawTransaction(tx, true)
+	_, err = w.client.SendRawTransaction(txToSend, true)
 	if err != nil {
 		return "", fmt.Errorf("error sending transaction: %s", err.Error())
 	}
 
-	return tx.TxHash().String(), nil
+	return txToSend.TxHash().String(), nil
 }

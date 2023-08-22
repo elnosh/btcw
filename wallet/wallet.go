@@ -112,6 +112,32 @@ func (w *Wallet) addUTXO(utxo *tx.UTXO) error {
 	return nil
 }
 
+// getPrivateKeyForUTXO returns the private key in WIF that can sign
+// or spend that UTXO
+func (w *Wallet) getPrivateKeyForUTXO(utxo tx.UTXO) (*btcutil.WIF, error) {
+	kp := w.getKeyPair(utxo.DerivationPath)
+	if kp == nil {
+		return nil, fmt.Errorf("key for UTXO not found")
+	}
+
+	passKey, err := w.GetDecodedKey()
+	if err != nil {
+		return nil, err
+	}
+
+	wifStr, err := Decrypt(kp.EncryptedPrivateKey, passKey)
+	if err != nil {
+		return nil, err
+	}
+
+	wif, err := btcutil.DecodeWIF(string(wifStr))
+	if err != nil {
+		return nil, fmt.Errorf("error decoding wif: %s", err.Error())
+	}
+
+	return wif, nil
+}
+
 func ScanForNewBlocks(ctx context.Context, wallet *Wallet, errChan chan error) {
 	go func(ctx context.Context) {
 		ticker := time.NewTicker(time.Second * 30)
@@ -177,17 +203,17 @@ func checkBlocks(wallet *Wallet, height int64) error {
 					// if match is found
 					// add UTXO and update wallet balance
 					if ok {
-						utxo := tx.NewUTXO(rawTx.Txid, vout.N, vout.Value, vout.ScriptPubKey.Hex, path)
-						if err := wallet.addUTXO(utxo); err != nil {
-							return fmt.Errorf("error adding new UTXO: %s", err.Error())
-						}
-
-						amt, err := btcutil.NewAmount(vout.Value)
+						utxoAmount, err := btcutil.NewAmount(vout.Value)
 						if err != nil {
 							return fmt.Errorf("error getting tx amount: %s", err.Error())
 						}
 
-						balance := wallet.balance + amt
+						utxo := tx.NewUTXO(rawTx.Txid, vout.N, utxoAmount, vout.ScriptPubKey.Hex, path)
+						if err := wallet.addUTXO(utxo); err != nil {
+							return fmt.Errorf("error adding new UTXO: %s", err.Error())
+						}
+
+						balance := wallet.balance + utxoAmount
 						if err := wallet.setBalance(balance); err != nil {
 							return fmt.Errorf("error setting wallet balance: %s", err.Error())
 						}
