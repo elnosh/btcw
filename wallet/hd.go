@@ -13,7 +13,7 @@ import (
 // that will be external and internal chain for first account
 // external chain path: m/44'/1'/0'/0
 // internal chain path: m/44'/1'/0'/1
-func DeriveHDKeys(seed []byte, encodedPass string) (master, acct0ext,
+func DeriveHDKeys(seed []byte) (master, acct0ext,
 	acct0int *hdkeychain.ExtendedKey, err error) {
 	// master node
 	// path: m

@@ -20,11 +20,11 @@ import (
 type (
 	address        = string
 	derivationPath = string
-	Chain          int
+	chain          int
 )
 
 const (
-	externalChain Chain = iota
+	externalChain chain = iota
 	internalChain
 )
 
@@ -103,7 +103,7 @@ func (w Wallet) getDecodedKey() ([]byte, error) {
 
 // getDecryptedAccountKey will take a Chain which can be either external
 // or internal and return a decrypted chain key
-func (w *Wallet) getDecryptedAccountKey(chain Chain) ([]byte, error) {
+func (w *Wallet) getDecryptedAccountKey(chain chain) ([]byte, error) {
 	var encryptedChainKey []byte
 
 	switch chain {
