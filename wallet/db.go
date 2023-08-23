@@ -50,7 +50,7 @@ func (w *Wallet) InitWalletBuckets(seed []byte, encodedHash string) error {
 		}
 
 		// decoded hash to get passkey
-		_, key, _, err := DecodeHash(encodedHash)
+		_, key, _, err := utils.DecodeHash(encodedHash)
 		if err != nil {
 			return err
 		}

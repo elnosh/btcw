@@ -13,6 +13,7 @@ import (
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/rpcclient"
+	"github.com/elnosh/btcw/utils"
 	bolt "go.etcd.io/bbolt"
 	"golang.org/x/term"
 )
@@ -89,7 +90,7 @@ func promptPassphrase() (string, error) {
 		return "", errors.New("passphrases do not match, please try again")
 	}
 
-	encodedHash, err := hashPassphrase(confirmPassphrase)
+	encodedHash, err := utils.HashPassphrase(confirmPassphrase)
 	if err != nil {
 		return "", err
 	}

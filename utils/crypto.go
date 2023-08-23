@@ -1,4 +1,4 @@
-package wallet
+package utils
 
 import (
 	"crypto/rand"
@@ -21,7 +21,7 @@ type params struct {
 	keylen      uint32
 }
 
-func hashPassphrase(passphrase []byte) (string, error) {
+func HashPassphrase(passphrase []byte) (string, error) {
 	p := &params{
 		memory:      64 * 1024,
 		iterations:  3,
@@ -44,7 +44,7 @@ func hashPassphrase(passphrase []byte) (string, error) {
 	return encoded, nil
 }
 
-func verifyPassphrase(encodedHash, passphrase string) bool {
+func VerifyPassphrase(encodedHash, passphrase string) bool {
 	p, key, salt, err := DecodeHash(encodedHash)
 	if err != nil {
 		return false
@@ -115,19 +115,4 @@ func Decrypt(input, key []byte) ([]byte, error) {
 	}
 
 	return decrypted, nil
-}
-
-func (w Wallet) GetDecodedKey() ([]byte, error) {
-	encodedHash := w.getEncodedHash()
-	if encodedHash == nil {
-		return nil, errors.New("encoded hash not found")
-	}
-
-	// decode hash to get key
-	_, key, _, err := DecodeHash(string(encodedHash))
-	if err != nil {
-		return nil, fmt.Errorf("error decoding key: %v", err)
-	}
-
-	return key, nil
 }

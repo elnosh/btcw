@@ -44,7 +44,7 @@ func SelectUTXOs(amountToSend btcutil.Amount, utxos []UTXO) ([]UTXO, btcutil.Amo
 		if utxosAmount > amountToSend {
 			return utxosCopy, utxosAmount, nil
 		} else {
-			return nil, 0, errors.New("not enough value in utxos to fulfill amount")
+			return nil, 0, ErrInsufficientAmount
 		}
 	}
 
@@ -76,7 +76,7 @@ func SelectUTXOs(amountToSend btcutil.Amount, utxos []UTXO) ([]UTXO, btcutil.Amo
 					selectedUtxos = append(selectedUtxos, utxosCopy[0])
 					break
 				} else {
-					return nil, 0, errors.New("not enough value in utxos to fulfill amount")
+					return nil, 0, ErrInsufficientAmount
 				}
 			}
 		}

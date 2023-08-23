@@ -6,6 +6,7 @@ import (
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/elnosh/btcw/utils"
 )
 
 type KeyPair struct {
@@ -31,13 +32,13 @@ func (w *Wallet) newKeyPair(extendedKey *hdkeychain.ExtendedKey) (*KeyPair, erro
 		return nil, err
 	}
 
-	passKey, err := w.GetDecodedKey()
+	passKey, err := w.getDecodedKey()
 	if err != nil {
 		return nil, err
 	}
 
 	// encrypt wif for storage
-	encryptedWIF, err := Encrypt([]byte(wif.String()), passKey)
+	encryptedWIF, err := utils.Encrypt([]byte(wif.String()), passKey)
 	if err != nil {
 		return nil, fmt.Errorf("error encrypting private key: %v", err.Error())
 	}

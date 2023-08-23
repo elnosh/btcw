@@ -13,6 +13,7 @@ import (
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/elnosh/btcw/tx"
+	"github.com/elnosh/btcw/utils"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -38,33 +39,6 @@ type Wallet struct {
 	lastScannedBlock int64
 
 	addresses map[address]derivationPath
-}
-
-// getDecryptedAccountKey will take a Chain which can be either external
-// or internal and return a decrypted chain key
-func (w *Wallet) getDecryptedAccountKey(chain Chain) ([]byte, error) {
-	var encryptedChainKey []byte
-
-	switch chain {
-	case externalChain:
-		encryptedChainKey = w.getAcct0External()
-	case internalChain:
-		encryptedChainKey = w.getAcct0Internal()
-	default:
-		return nil, errors.New("invalid chain value")
-	}
-
-	passKey, err := w.GetDecodedKey()
-	if err != nil {
-		return nil, err
-	}
-
-	decryptedChainKey, err := Decrypt(encryptedChainKey, passKey)
-	if err != nil {
-		return nil, err
-	}
-
-	return decryptedChainKey, nil
 }
 
 func (w *Wallet) setLastExternalIdx(idx uint32) error {
@@ -112,6 +86,48 @@ func (w *Wallet) addUTXO(utxo *tx.UTXO) error {
 	return nil
 }
 
+func (w Wallet) getDecodedKey() ([]byte, error) {
+	encodedHash := w.getEncodedHash()
+	if encodedHash == nil {
+		return nil, errors.New("encoded hash not found")
+	}
+
+	// decode hash to get key
+	_, key, _, err := utils.DecodeHash(string(encodedHash))
+	if err != nil {
+		return nil, fmt.Errorf("error decoding key: %v", err)
+	}
+
+	return key, nil
+}
+
+// getDecryptedAccountKey will take a Chain which can be either external
+// or internal and return a decrypted chain key
+func (w *Wallet) getDecryptedAccountKey(chain Chain) ([]byte, error) {
+	var encryptedChainKey []byte
+
+	switch chain {
+	case externalChain:
+		encryptedChainKey = w.getAcct0External()
+	case internalChain:
+		encryptedChainKey = w.getAcct0Internal()
+	default:
+		return nil, errors.New("invalid chain value")
+	}
+
+	passKey, err := w.getDecodedKey()
+	if err != nil {
+		return nil, err
+	}
+
+	decryptedChainKey, err := utils.Decrypt(encryptedChainKey, passKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return decryptedChainKey, nil
+}
+
 // getPrivateKeyForUTXO returns the private key in WIF that can sign
 // or spend that UTXO
 func (w *Wallet) getPrivateKeyForUTXO(utxo tx.UTXO) (*btcutil.WIF, error) {
@@ -120,12 +136,12 @@ func (w *Wallet) getPrivateKeyForUTXO(utxo tx.UTXO) (*btcutil.WIF, error) {
 		return nil, fmt.Errorf("key for UTXO not found")
 	}
 
-	passKey, err := w.GetDecodedKey()
+	passKey, err := w.getDecodedKey()
 	if err != nil {
 		return nil, err
 	}
 
-	wifStr, err := Decrypt(kp.EncryptedPrivateKey, passKey)
+	wifStr, err := utils.Decrypt(kp.EncryptedPrivateKey, passKey)
 	if err != nil {
 		return nil, err
 	}

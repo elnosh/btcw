@@ -6,6 +6,7 @@ import (
 
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/elnosh/btcw/utils"
 )
 
 // derive keys for initial HD wallet setup - BIP-44
@@ -60,17 +61,17 @@ func DeriveHDKeys(seed []byte, encodedPass string) (master, acct0ext,
 
 func EncryptHDKeys(key []byte, master, acct0ext, acct0int *hdkeychain.ExtendedKey) (encryptedMaster,
 	encryptedAcct0ext, encryptedAcct0int []byte, err error) {
-	encryptedMaster, err = Encrypt([]byte(master.String()), key)
+	encryptedMaster, err = utils.Encrypt([]byte(master.String()), key)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("error encrypting key: %s", err.Error())
 	}
 
-	encryptedAcct0ext, err = Encrypt([]byte(acct0ext.String()), key)
+	encryptedAcct0ext, err = utils.Encrypt([]byte(acct0ext.String()), key)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("error encrypting key: %s", err.Error())
 	}
 
-	encryptedAcct0int, err = Encrypt([]byte(acct0int.String()), key)
+	encryptedAcct0int, err = utils.Encrypt([]byte(acct0int.String()), key)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("error encrypting key: %s", err.Error())
 	}
