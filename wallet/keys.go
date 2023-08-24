@@ -80,7 +80,7 @@ func (w *Wallet) generateNewExternalKeyPair() (*KeyPair, error) {
 
 	// save newly generate key pair with derivation path as key
 	derivationPath := fmt.Sprintf("m/44'/1'/0'/0/%d", w.lastExternalIdx)
-	err = w.saveKeyPair(derivationPath, keyPair)
+	err = w.addKey(derivationPath, keyPair)
 	if err != nil {
 		return nil, err
 	}
@@ -112,9 +112,8 @@ func (w *Wallet) generateNewInternalKeyPair() (*KeyPair, error) {
 		return nil, err
 	}
 
-	// save newly generate key pair with derivation path as key
 	derivationPath := fmt.Sprintf("m/44'/1'/0'/1/%d", w.lastInternalIdx)
-	err = w.saveKeyPair(derivationPath, keyPair)
+	err = w.addKey(derivationPath, keyPair)
 	if err != nil {
 		return nil, err
 	}

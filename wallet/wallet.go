@@ -86,6 +86,16 @@ func (w *Wallet) addUTXO(utxo tx.UTXO) error {
 	return nil
 }
 
+// add key in db and update addresses map with address of key
+func (w *Wallet) addKey(derivationPath string, key *KeyPair) error {
+	err := w.saveKeyPair(derivationPath, key)
+	if err != nil {
+		return err
+	}
+	w.addresses[key.Address] = derivationPath
+	return nil
+}
+
 func (w Wallet) getDecodedKey() ([]byte, error) {
 	encodedHash := w.getEncodedHash()
 	if encodedHash == nil {
