@@ -57,12 +57,15 @@ func SelectUTXOs(amountToSend btcutil.Amount, utxos []UTXO) ([]UTXO, btcutil.Amo
 		idx := rand.Intn(max)
 
 		utxo := utxosCopy[idx]
-		selectedUtxos = append(selectedUtxos, utxo)
+		// only use utxo if it's unspent
+		if !utxo.Spent {
+			selectedUtxos = append(selectedUtxos, utxo)
+			selectedAmount += utxo.Value
+		}
+
 		// delete selected utxo so that it does not
 		// get selected again
 		DeleteUTXO(utxosCopy, idx)
-
-		selectedAmount += utxo.Value
 
 		if selectedAmount > amountToSend {
 			break

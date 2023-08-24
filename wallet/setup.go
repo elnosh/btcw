@@ -23,10 +23,6 @@ var (
 	ErrWalletNotExists = errors.New("wallet does not exist")
 )
 
-func NewWallet(db *bolt.DB) *Wallet {
-	return &Wallet{db: db}
-}
-
 func CreateWallet() error {
 	path := setupWalletDir()
 	db, err := bolt.Open(filepath.Join(path, "wallet.db"), 0600, nil)

@@ -3,6 +3,7 @@ package wallet
 import (
 	"encoding/hex"
 	"fmt"
+	"strconv"
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/txscript"
@@ -51,7 +52,7 @@ func (w *Wallet) createRawTransaction(address string, amountToSend, feeRate btcu
 		// calculate estimate fee for tx
 		size := rawTx.SerializeSize()
 		kbSize := int64(size) / 1000
-		estimateFee := kbSize * int64(feeRate)
+		estimateFee := kbSize * int64(feeRate) * 2
 
 		// subtract fee from change
 		rawTx.TxOut[len(rawTx.TxOut)-1].Value -= estimateFee
@@ -110,4 +111,25 @@ func validateSignedTransaction(tx *wire.MsgTx, utxos []tx.UTXO) error {
 	}
 
 	return nil
+}
+
+// markSpentUTXOs takes a list of utxos and if it finds them in the wallet
+// it will mark them as spent
+func (w *Wallet) markSpentUTXOs(utxos []tx.UTXO) {
+	for _, utxo := range utxos {
+		for _, walletUtxo := range w.utxos {
+			if walletUtxo.TxID == utxo.TxID {
+				// update in db and struct
+				utxo.Spent = true
+				idx := strconv.FormatUint(uint64(utxo.VoutIdx), 10)
+				key := utxo.TxID + idx
+				err := w.updateUTXO(key, utxo)
+				// only update utxo in wallet struct if update in db succeeded
+				if err == nil {
+					walletUtxo.Spent = true
+				}
+				break
+			}
+		}
+	}
 }

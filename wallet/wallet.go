@@ -77,12 +77,12 @@ func (w *Wallet) setBalance(balance btcutil.Amount) error {
 	return nil
 }
 
-func (w *Wallet) addUTXO(utxo *tx.UTXO) error {
+func (w *Wallet) addUTXO(utxo tx.UTXO) error {
 	err := w.saveUTXO(utxo)
 	if err != nil {
 		return err
 	}
-	w.utxos = append(w.utxos, *utxo)
+	w.utxos = append(w.utxos, utxo)
 	return nil
 }
 
@@ -225,7 +225,7 @@ func checkBlocks(wallet *Wallet, height int64) error {
 						}
 
 						utxo := tx.NewUTXO(rawTx.Txid, vout.N, utxoAmount, vout.ScriptPubKey.Hex, path)
-						if err := wallet.addUTXO(utxo); err != nil {
+						if err := wallet.addUTXO(*utxo); err != nil {
 							return fmt.Errorf("error adding new UTXO: %s", err.Error())
 						}
 

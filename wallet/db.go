@@ -297,7 +297,7 @@ func (w *Wallet) updateBalanceDB(balance btcutil.Amount) error {
 	return nil
 }
 
-func (w *Wallet) saveUTXO(utxo *tx.UTXO) error {
+func (w *Wallet) saveUTXO(utxo tx.UTXO) error {
 	jsonbytes, err := json.Marshal(utxo)
 	if err != nil {
 		return fmt.Errorf("error marshalling utxo: %s", err.Error())
@@ -311,6 +311,33 @@ func (w *Wallet) saveUTXO(utxo *tx.UTXO) error {
 		return err
 	}); err != nil {
 		return fmt.Errorf("error saving utxo: %s", err.Error())
+	}
+	return nil
+}
+
+func (w *Wallet) updateUTXO(key string, utxo tx.UTXO) error {
+	jsonbytes, err := json.Marshal(utxo)
+	if err != nil {
+		return fmt.Errorf("error marshalling utxo: %s", err.Error())
+	}
+
+	if err := w.db.Update(func(tx *bolt.Tx) error {
+		utxosb := tx.Bucket([]byte(utxosBucket))
+		keyb := []byte(key)
+		val := utxosb.Get(keyb)
+
+		// only put if utxo already exists
+		if val != nil {
+			err := utxosb.Put(keyb, jsonbytes)
+			if err != nil {
+				return err
+			}
+		} else {
+			return fmt.Errorf("utxo does not exist")
+		}
+		return nil
+	}); err != nil {
+		return fmt.Errorf("error updating utxo: %s", err.Error())
 	}
 	return nil
 }
