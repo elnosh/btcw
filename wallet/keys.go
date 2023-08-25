@@ -95,6 +95,8 @@ func (w *Wallet) generateNewExternalKeyPair() (*KeyPair, error) {
 	return keyPair, nil
 }
 
+// generateNewInternalKeyPair generates key in internal chain
+// for change outputs.
 func (w *Wallet) generateNewInternalKeyPair() (*KeyPair, error) {
 	acct0internal, err := w.getDecryptedAccountKey(internalChain)
 	if err != nil {
@@ -113,7 +115,7 @@ func (w *Wallet) generateNewInternalKeyPair() (*KeyPair, error) {
 	}
 
 	derivationPath := fmt.Sprintf("m/44'/1'/0'/1/%d", w.lastInternalIdx)
-	err = w.addKey(derivationPath, keyPair)
+	err = w.saveKeyPair(derivationPath, keyPair)
 	if err != nil {
 		return nil, err
 	}

@@ -1,10 +1,10 @@
 package wallet
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
-	"strconv"
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/elnosh/btcw/tx"
@@ -265,6 +265,31 @@ func (w *Wallet) getKeyPair(derivationPath string) *KeyPair {
 	return keyPair
 }
 
+// getDerivationPathForAddress returns the derivation path of the key
+// for the address passed. If it does not find any, it returns
+// an empty string
+func (w *Wallet) getDerivationPathForAddress(address string) string {
+	derivationPath := ""
+	addressBytes := []byte(address)
+
+	w.db.View(func(tx *bolt.Tx) error {
+		keysb := tx.Bucket([]byte(keysBucket))
+
+		c := keysb.Cursor()
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			if bytes.Equal(addressBytes, k) {
+				var kp KeyPair
+				_ = json.Unmarshal(v, &kp)
+				derivationPath = kp.Address
+				break
+			}
+		}
+		return nil
+	})
+
+	return derivationPath
+}
+
 func (w *Wallet) loadAddresses() error {
 	if err := w.db.View(func(tx *bolt.Tx) error {
 		keysb := tx.Bucket([]byte(keysBucket))
@@ -303,10 +328,9 @@ func (w *Wallet) saveUTXO(utxo tx.UTXO) error {
 		return fmt.Errorf("error marshalling utxo: %s", err.Error())
 	}
 
-	if err := w.db.Update(func(tx *bolt.Tx) error {
-		utxosb := tx.Bucket([]byte(utxosBucket))
-		idx := strconv.FormatUint(uint64(utxo.VoutIdx), 10)
-		key := []byte(utxo.TxID + idx)
+	if err := w.db.Update(func(dbtx *bolt.Tx) error {
+		utxosb := dbtx.Bucket([]byte(utxosBucket))
+		key := []byte(utxo.GetOutpoint())
 		err := utxosb.Put(key, jsonbytes)
 		return err
 	}); err != nil {

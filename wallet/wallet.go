@@ -38,7 +38,7 @@ type Wallet struct {
 	lastInternalIdx  uint32
 	lastScannedBlock int64
 
-	addresses map[address]derivationPath
+	addresses map[address]derivationPath // only for external addresses to track when receiving
 }
 
 func (w *Wallet) setLastExternalIdx(idx uint32) error {

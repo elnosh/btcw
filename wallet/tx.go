@@ -3,9 +3,9 @@ package wallet
 import (
 	"encoding/hex"
 	"fmt"
-	"strconv"
 
 	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/elnosh/btcw/tx"
@@ -113,6 +113,48 @@ func validateSignedTransaction(tx *wire.MsgTx, utxos []tx.UTXO) error {
 	return nil
 }
 
+// takes in txMsg, selectedUTXOs and amount to send. From that, it will return
+// the change output, index of change output and fee
+func extractTxInfo(txMsg *wire.MsgTx, usedUTXOs []tx.UTXO, amountToSend btcutil.Amount) (wire.TxOut, uint32, btcutil.Amount) {
+	var totalOutput int64 = 0
+	var totalInput int64 = 0
+
+	for _, utxo := range usedUTXOs {
+		totalInput += int64(utxo.Value)
+	}
+
+	var changeOutput wire.TxOut
+	changeIdx := 0
+	for idx, txout := range txMsg.TxOut {
+		totalOutput += txout.Value
+
+		if txout.Value != int64(amountToSend) {
+			changeOutput = *txout
+			changeIdx = idx
+		}
+	}
+	fee := btcutil.Amount(totalInput - totalOutput)
+
+	return changeOutput, uint32(changeIdx), fee
+}
+
+// updateWalletAfterTx will update wallet fields based on the transaction sent.
+// It will mark utxos used in the tx as spent, add change UTXO to wallet and update
+// the balance
+func (w *Wallet) updateWalletAfterTx(txMsg *wire.MsgTx, usedUTXOs []tx.UTXO, amountToSend btcutil.Amount) {
+	changeOutput, changeIdx, fee := extractTxInfo(txMsg, usedUTXOs, amountToSend)
+
+	// mark utxos used to create transaction as spent
+	go w.markSpentUTXOs(usedUTXOs)
+
+	// add change utxo to wallet utxo list
+	go w.addChangeUTXO(txMsg, changeOutput, changeIdx)
+
+	// new balance will be current wallet balance - amount wanting to be sent - fee
+	newBalance := w.balance - amountToSend - fee
+	go w.setBalance(newBalance)
+}
+
 // markSpentUTXOs takes a list of utxos and if it finds them in the wallet
 // it will mark them as spent
 func (w *Wallet) markSpentUTXOs(utxos []tx.UTXO) {
@@ -121,8 +163,7 @@ func (w *Wallet) markSpentUTXOs(utxos []tx.UTXO) {
 			if walletUtxo.TxID == utxo.TxID {
 				// update in db and struct
 				utxo.Spent = true
-				idx := strconv.FormatUint(uint64(utxo.VoutIdx), 10)
-				key := utxo.TxID + idx
+				key := utxo.GetOutpoint()
 				err := w.updateUTXO(key, utxo)
 				// only update utxo in wallet struct if update in db succeeded
 				if err == nil {
@@ -132,4 +173,20 @@ func (w *Wallet) markSpentUTXOs(utxos []tx.UTXO) {
 			}
 		}
 	}
+}
+
+// adds change output to wallet utxos
+func (w *Wallet) addChangeUTXO(txMsg *wire.MsgTx, changeOutput wire.TxOut, changeIdx uint32) {
+	txId := txMsg.TxHash().String()
+
+	_, addrs, _, err := txscript.ExtractPkScriptAddrs(changeOutput.PkScript, &chaincfg.SimNetParams)
+	if err != nil {
+		fmt.Printf("could not extract address script info: %s", err.Error())
+	}
+	derivationPath := w.getDerivationPathForAddress(addrs[0].String())
+	value := btcutil.Amount(changeOutput.Value)
+	script := string(changeOutput.PkScript)
+
+	changeUTXO := tx.NewUTXO(txId, changeIdx, value, script, derivationPath)
+	_ = w.addUTXO(*changeUTXO)
 }

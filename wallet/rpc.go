@@ -74,9 +74,10 @@ func (w *Wallet) SendToAddress(address string, amount float64) (string, error) {
 		return "", fmt.Errorf("error sending transaction: %s", err.Error())
 	}
 
-	// mark utxos used to create transaction as spent
-	go w.markSpentUTXOs(selectedUtxos)
-	// TODO: update balance
+	// if no errors while creating and broadcasting tx, then update the wallet fields
+	// accordingly. Subtract amount sent and fee from balance, mark spent utxos
+	// and add change utxo to list of wallet utxos
+	w.updateWalletAfterTx(txToSend, selectedUtxos, amountToSend)
 
 	return txToSend.TxHash().String(), nil
 }

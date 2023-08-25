@@ -3,6 +3,7 @@ package tx
 import (
 	"errors"
 	"math/rand"
+	"strconv"
 
 	"github.com/btcsuite/btcd/btcutil"
 )
@@ -19,6 +20,11 @@ type UTXO struct {
 func NewUTXO(txid string, voutIdx uint32, value btcutil.Amount, script, path string) *UTXO {
 	return &UTXO{TxID: txid, VoutIdx: voutIdx, Value: value, ScriptPubKey: script,
 		Spent: false, DerivationPath: path}
+}
+
+func (utxo *UTXO) GetOutpoint() string {
+	idx := strconv.FormatUint(uint64(utxo.VoutIdx), 10)
+	return utxo.TxID + ":" + idx
 }
 
 // deletes a utxo from the slice
