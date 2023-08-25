@@ -113,8 +113,8 @@ func validateSignedTransaction(tx *wire.MsgTx, utxos []tx.UTXO) error {
 	return nil
 }
 
-// takes in txMsg, selectedUTXOs and amount to send. From that, it will return
-// the change output, index of change output and fee
+// extractTxInfo takes in a wire tx, utxos used as input and amount sent. From that,
+// it will return the change output, index of change output and fee
 func extractTxInfo(txMsg *wire.MsgTx, usedUTXOs []tx.UTXO, amountToSend btcutil.Amount) (wire.TxOut, uint32, btcutil.Amount) {
 	var totalOutput int64 = 0
 	var totalInput int64 = 0

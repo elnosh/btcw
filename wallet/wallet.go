@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/btcsuite/btcd/btcutil"
@@ -32,8 +33,12 @@ type Wallet struct {
 	db     *bolt.DB
 	client *rpcclient.Client
 
-	utxos            []tx.UTXO
-	balance          btcutil.Amount
+	utxos   []tx.UTXO
+	utxoMtx sync.Mutex
+
+	balance    btcutil.Amount
+	balanceMtx sync.Mutex
+
 	lastExternalIdx  uint32
 	lastInternalIdx  uint32
 	lastScannedBlock int64
@@ -73,7 +78,9 @@ func (w *Wallet) setBalance(balance btcutil.Amount) error {
 	if err != nil {
 		return err
 	}
+	w.balanceMtx.Lock()
 	w.balance = balance
+	w.balanceMtx.Unlock()
 	return nil
 }
 
@@ -82,7 +89,9 @@ func (w *Wallet) addUTXO(utxo tx.UTXO) error {
 	if err != nil {
 		return err
 	}
+	w.utxoMtx.Lock()
 	w.utxos = append(w.utxos, utxo)
+	w.utxoMtx.Unlock()
 	return nil
 }
 
@@ -96,7 +105,7 @@ func (w *Wallet) addKey(derivationPath string, key *KeyPair) error {
 	return nil
 }
 
-func (w Wallet) getDecodedKey() ([]byte, error) {
+func (w *Wallet) getDecodedKey() ([]byte, error) {
 	encodedHash := w.getEncodedHash()
 	if encodedHash == nil {
 		return nil, errors.New("encoded hash not found")
