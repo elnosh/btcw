@@ -1,7 +1,6 @@
 package tx
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/btcsuite/btcd/btcutil"
@@ -11,15 +10,11 @@ import (
 	"github.com/btcsuite/btcd/wire"
 )
 
-var (
-	ErrInsufficientAmount = errors.New("not enough value in utxos to fulfill amount")
-)
-
 // CreateTxIn returns a new wire.TxIn from the utxo referenced
 func CreateTxIn(previousUtxo UTXO) (*wire.TxIn, error) {
 	prevTxHash, err := chainhash.NewHashFromStr(previousUtxo.TxID)
 	if err != nil {
-		return nil, fmt.Errorf("error getting previous tx hash: %s", err.Error())
+		return nil, fmt.Errorf("chainhash.NewHashFromStr: %v", err)
 	}
 	prevOutPoint := wire.NewOutPoint(prevTxHash, previousUtxo.VoutIdx)
 	txIn := wire.NewTxIn(prevOutPoint, nil, nil)
@@ -31,12 +26,12 @@ func CreateTxIn(previousUtxo UTXO) (*wire.TxIn, error) {
 func CreateTxOut(address string, amount btcutil.Amount) (*wire.TxOut, error) {
 	addr, err := btcutil.DecodeAddress(address, &chaincfg.SimNetParams)
 	if err != nil {
-		return nil, fmt.Errorf("error decoding address for tx out: %s", err.Error())
+		return nil, fmt.Errorf("btcutil.DecodeAddress: %v", err)
 	}
 
 	script, err := txscript.PayToAddrScript(addr)
 	if err != nil {
-		return nil, fmt.Errorf("error creating tx out script: %s", err.Error())
+		return nil, fmt.Errorf("txscript.PayToAddrScript: %v", err)
 	}
 
 	txOut := wire.NewTxOut(int64(amount), script)

@@ -13,6 +13,10 @@ import (
 	"golang.org/x/crypto/nacl/secretbox"
 )
 
+var (
+	invalidHashErr = errors.New("invalid hash")
+)
+
 type params struct {
 	memory      uint32
 	iterations  uint32
@@ -55,7 +59,6 @@ func VerifyPassphrase(encodedHash, passphrase string) bool {
 }
 
 func DecodeHash(encodedHash string) (p *params, key, salt []byte, err error) {
-	invalidHashErr := errors.New("invalid hash")
 	split := strings.Split(encodedHash, "$")
 	if len(split) != 6 {
 		return nil, nil, nil, invalidHashErr
@@ -92,7 +95,7 @@ func DecodeHash(encodedHash string) (p *params, key, salt []byte, err error) {
 func Encrypt(input, key []byte) ([]byte, error) {
 	var nonce [24]byte
 	if _, err := io.ReadFull(rand.Reader, nonce[:]); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("io.ReadFull: %w", err)
 	}
 
 	var secret [32]byte

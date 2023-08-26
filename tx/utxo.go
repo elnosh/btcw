@@ -8,6 +8,10 @@ import (
 	"github.com/btcsuite/btcd/btcutil"
 )
 
+var (
+	ErrInsufficientAmount = errors.New("not enough value in utxos to fulfill amount")
+)
+
 type UTXO struct {
 	TxID           string
 	VoutIdx        uint32
