@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/elnosh/btcw/tx"
@@ -15,7 +14,7 @@ import (
 // and amountToSend. It will create it from the set of utxos passed and
 // it will add change output if needed
 func (w *Wallet) createRawTransaction(address string, amountToSend, feeRate btcutil.Amount, utxos []tx.UTXO) (*wire.MsgTx, error) {
-	txOut, err := tx.CreateTxOut(address, amountToSend)
+	txOut, err := tx.CreateTxOut(address, amountToSend, w.network)
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +42,7 @@ func (w *Wallet) createRawTransaction(address string, amountToSend, feeRate btcu
 		}
 
 		// create change output from new internal address and change amount
-		changeTxOut, err := tx.CreateTxOut(newInternalKey.Address, changeAmount)
+		changeTxOut, err := tx.CreateTxOut(newInternalKey.Address, changeAmount, w.network)
 		if err != nil {
 			return nil, err
 		}
@@ -179,11 +178,14 @@ func (w *Wallet) markSpentUTXOs(utxos []tx.UTXO) {
 func (w *Wallet) addChangeUTXO(txMsg *wire.MsgTx, changeOutput wire.TxOut, changeIdx uint32) {
 	txId := txMsg.TxHash().String()
 
-	_, addrs, _, err := txscript.ExtractPkScriptAddrs(changeOutput.PkScript, &chaincfg.SimNetParams)
+	_, addrs, _, err := txscript.ExtractPkScriptAddrs(changeOutput.PkScript, w.network)
 	if err != nil {
 		fmt.Printf("could not extract address script info: %s", err.Error())
 	}
 	derivationPath := w.getDerivationPathForAddress(addrs[0].String())
+	if derivationPath == "" {
+		fmt.Printf("no derivation path for address: %v", addrs[0].String())
+	}
 	value := btcutil.Amount(changeOutput.Value)
 	script := string(changeOutput.PkScript)
 

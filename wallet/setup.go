@@ -10,9 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
-	"github.com/btcsuite/btcd/rpcclient"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/elnosh/btcw/utils"
 	bolt "go.etcd.io/bbolt"
 	"golang.org/x/term"
@@ -125,7 +124,7 @@ func walletExists(db *bolt.DB) bool {
 	return exists
 }
 
-func LoadWallet(rpcuser, rpcpass string) (*Wallet, error) {
+func LoadWallet(testnet bool, rpcuser, rpcpass, node string) (*Wallet, error) {
 	path := setupWalletDir()
 	db, err := bolt.Open(filepath.Join(path, "wallet.db"), 0600, nil)
 	if err != nil {
@@ -136,25 +135,34 @@ func LoadWallet(rpcuser, rpcpass string) (*Wallet, error) {
 		return nil, ErrWalletNotExists
 	}
 
-	// TODO: handle difference between bitcoin core and btcd
-	certHomeDir := btcutil.AppDataDir("btcd", false)
-	certs, err := os.ReadFile(filepath.Join(certHomeDir, "rpc.cert"))
-	connCfg := &rpcclient.ConnConfig{
-		Host:         "localhost:18556",
-		User:         rpcuser,
-		Pass:         rpcpass,
-		Certificates: certs,
-		HTTPPostMode: true,
-		// DisableTLS:   true,
-	}
+	network := &chaincfg.TestNet3Params
 
-	client, err := rpcclient.New(connCfg, nil)
-	if err != nil {
-		return nil, fmt.Errorf("error setting up rpc client: %v", err)
+	var client NodeClient
+	switch node {
+	case "btcd":
+		client, err = NewBtcdClient(testnet, rpcuser, rpcpass)
+		if err != nil {
+			return nil, fmt.Errorf("wallet.NewBtcdClient: %w", err)
+		}
+
+		if !testnet {
+			network = &chaincfg.SimNetParams
+		}
+	case "core":
+		client, err = NewBitcoinCoreClient(testnet, rpcuser, rpcpass)
+		if err != nil {
+			return nil, fmt.Errorf("wallet.NewBitcoinCoreClient: %w", err)
+		}
+
+		if !testnet {
+			network = &chaincfg.RegressionNetParams
+		}
+	default:
+		return nil, fmt.Errorf("invalid node type")
 	}
 
 	addresses := make(map[address]derivationPath)
-	wallet := &Wallet{db: db, client: client, addresses: addresses}
+	wallet := &Wallet{db: db, client: client, network: network, addresses: addresses}
 
 	wallet.balance = wallet.getBalance()
 	wallet.lastExternalIdx = wallet.getLastExternalIdx()

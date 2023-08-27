@@ -36,10 +36,7 @@ func (w *Wallet) SendToAddress(address string, amount float64) (string, error) {
 	}
 
 	// get estimate fee from btc node
-	btcfee, err := w.client.EstimateFee(1)
-	if err != nil {
-		return "", fmt.Errorf("error estimating fee")
-	}
+	btcfee := w.client.EstimateFee(1)
 	fee, err := btcutil.NewAmount(btcfee)
 	if err != nil {
 		return "", fmt.Errorf("error estimating fee")

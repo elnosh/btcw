@@ -13,11 +13,11 @@ import (
 // that will be external and internal chain for first account
 // external chain path: m/44'/1'/0'/0
 // internal chain path: m/44'/1'/0'/1
-func DeriveHDKeys(seed []byte) (master, acct0ext,
+func DeriveHDKeys(seed []byte, net *chaincfg.Params) (master, acct0ext,
 	acct0int *hdkeychain.ExtendedKey, err error) {
 	// master node
 	// path: m
-	master, err = hdkeychain.NewMaster(seed, &chaincfg.SimNetParams)
+	master, err = hdkeychain.NewMaster(seed, net)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -63,17 +63,17 @@ func EncryptHDKeys(key []byte, master, acct0ext, acct0int *hdkeychain.ExtendedKe
 	encryptedAcct0ext, encryptedAcct0int []byte, err error) {
 	encryptedMaster, err = utils.Encrypt([]byte(master.String()), key)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("error encrypting key: %s", err.Error())
+		return nil, nil, nil, fmt.Errorf("error encrypting key: %v", err)
 	}
 
 	encryptedAcct0ext, err = utils.Encrypt([]byte(acct0ext.String()), key)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("error encrypting key: %s", err.Error())
+		return nil, nil, nil, fmt.Errorf("error encrypting key: %v", err)
 	}
 
 	encryptedAcct0int, err = utils.Encrypt([]byte(acct0int.String()), key)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("error encrypting key: %s", err.Error())
+		return nil, nil, nil, fmt.Errorf("error encrypting key: %v", err)
 	}
 
 	return encryptedMaster, encryptedAcct0ext, encryptedAcct0int, nil

@@ -44,7 +44,7 @@ func (w *Wallet) InitWalletBuckets(seed []byte, encodedHash string) error {
 		}
 
 		// derive keys to be stored
-		master, acct0ext, acct0int, err := DeriveHDKeys(seed)
+		master, acct0ext, acct0int, err := DeriveHDKeys(seed, w.network)
 		if err != nil {
 			return err
 		}

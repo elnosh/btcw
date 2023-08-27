@@ -11,7 +11,10 @@ import (
 )
 
 func main() {
-	flags := parseFlags()
+	flags, err := parseFlags()
+	if err != nil {
+		printErr(err)
+	}
 
 	if flags.Create {
 		err := wallet.CreateWallet()
@@ -23,7 +26,12 @@ func main() {
 			printErr(errors.New("RPC username and password are required to start wallet"))
 		}
 
-		w, err := wallet.LoadWallet(flags.RPCUser, flags.RPCPass)
+		testnet := !flags.Simnet
+		if flags.Node == "core" {
+			testnet = !flags.Regtest
+		}
+
+		w, err := wallet.LoadWallet(testnet, flags.RPCUser, flags.RPCPass, flags.Node)
 		if err != nil {
 			if err == wallet.ErrWalletNotExists {
 				printErr(errors.New("A wallet does not exist. Please create one first with -create"))

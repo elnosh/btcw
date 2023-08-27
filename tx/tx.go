@@ -23,8 +23,8 @@ func CreateTxIn(previousUtxo UTXO) (*wire.TxIn, error) {
 
 // CreateTxOut returns a wire.TxOut with the script to pay the amount
 // to the address passed
-func CreateTxOut(address string, amount btcutil.Amount) (*wire.TxOut, error) {
-	addr, err := btcutil.DecodeAddress(address, &chaincfg.SimNetParams)
+func CreateTxOut(address string, amount btcutil.Amount, net *chaincfg.Params) (*wire.TxOut, error) {
+	addr, err := btcutil.DecodeAddress(address, net)
 	if err != nil {
 		return nil, fmt.Errorf("btcutil.DecodeAddress: %v", err)
 	}

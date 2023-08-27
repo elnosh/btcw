@@ -11,7 +11,6 @@ import (
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/elnosh/btcw/tx"
 	"github.com/elnosh/btcw/utils"
@@ -30,8 +29,9 @@ const (
 )
 
 type Wallet struct {
-	db     *bolt.DB
-	client *rpcclient.Client
+	db      *bolt.DB
+	client  NodeClient
+	network *chaincfg.Params
 
 	utxos   []tx.UTXO
 	utxoMtx sync.Mutex
@@ -225,7 +225,7 @@ func checkBlocks(wallet *Wallet, height int64) error {
 				}
 
 				// this will extract the address from the script
-				class, addrs, _, err := txscript.ExtractPkScriptAddrs(scriptAsm, &chaincfg.SimNetParams)
+				class, addrs, _, err := txscript.ExtractPkScriptAddrs(scriptAsm, wallet.network)
 				if err != nil {
 					return fmt.Errorf("error extractring address script info: %s", err.Error())
 				}

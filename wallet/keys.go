@@ -5,7 +5,6 @@ import (
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
-	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/elnosh/btcw/utils"
 )
 
@@ -27,7 +26,7 @@ func (w *Wallet) newKeyPair(extendedKey *hdkeychain.ExtendedKey) (*KeyPair, erro
 	}
 
 	// convert private key -> wif
-	wif, err := btcutil.NewWIF(privateKey, &chaincfg.SimNetParams, true)
+	wif, err := btcutil.NewWIF(privateKey, w.network, true)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +47,7 @@ func (w *Wallet) newKeyPair(extendedKey *hdkeychain.ExtendedKey) (*KeyPair, erro
 
 	// derive public key hash and address string from the
 	// serialized public key
-	addrPubKey, err := btcutil.NewAddressPubKey(serializedPubKey, &chaincfg.SimNetParams)
+	addrPubKey, err := btcutil.NewAddressPubKey(serializedPubKey, w.network)
 	if err != nil {
 		return nil, fmt.Errorf("error deriving address pub key: %v", err.Error())
 	}

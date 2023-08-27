@@ -1,7 +1,12 @@
 package wallet
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
+
 	"github.com/btcsuite/btcd/btcjson"
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/wire"
@@ -21,6 +26,33 @@ var (
 
 type BtcdClient struct {
 	client *rpcclient.Client
+}
+
+func NewBtcdClient(testnet bool, rpcuser, rpcpass string) (*BtcdClient, error) {
+	port := "18334"
+	if !testnet {
+		port = "18556"
+	}
+
+	certHomeDir := btcutil.AppDataDir("btcd", false)
+	certs, err := os.ReadFile(filepath.Join(certHomeDir, "rpc.cert"))
+	if err != nil {
+		return nil, fmt.Errorf("os.ReadFile: %v", err)
+	}
+	connCfg := &rpcclient.ConnConfig{
+		Host:         "localhost:" + port,
+		User:         rpcuser,
+		Pass:         rpcpass,
+		Certificates: certs,
+		HTTPPostMode: true,
+	}
+
+	client, err := rpcclient.New(connCfg, nil)
+	if err != nil {
+		return nil, fmt.Errorf("rpcclient.New: %v", err)
+	}
+	btcdClient := &BtcdClient{client: client}
+	return btcdClient, nil
 }
 
 func (btcd *BtcdClient) GetBlockCount() (int64, error) {
@@ -49,6 +81,27 @@ func (btcd *BtcdClient) EstimateFee(numBlocks int64) float64 {
 
 type BitcoinCoreClient struct {
 	client *rpcclient.Client
+}
+
+func NewBitcoinCoreClient(testnet bool, rpcuser, rpcpass string) (*BitcoinCoreClient, error) {
+	port := "18332"
+	if !testnet {
+		port = "18443"
+	}
+	connCfg := &rpcclient.ConnConfig{
+		Host:         "localhost:" + port,
+		User:         rpcuser,
+		Pass:         rpcpass,
+		HTTPPostMode: true,
+		DisableTLS:   true,
+	}
+
+	client, err := rpcclient.New(connCfg, nil)
+	if err != nil {
+		return nil, fmt.Errorf("rpcclient.New: %v", err)
+	}
+	coreClient := &BitcoinCoreClient{client: client}
+	return coreClient, nil
 }
 
 func (core *BitcoinCoreClient) GetBlockCount() (int64, error) {
