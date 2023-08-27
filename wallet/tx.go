@@ -49,8 +49,7 @@ func (w *Wallet) createRawTransaction(address string, amountToSend, feeRate btcu
 
 		// calculate estimate fee for tx
 		size := rawTx.SerializeSize()
-		kbSize := int64(size) / 1000
-		estimateFee := kbSize * int64(feeRate) * 2
+		estimateFee := int64(size) * int64(feeRate) * 2
 
 		// subtract fee from change
 		rawTx.TxOut[len(rawTx.TxOut)-1].Value -= estimateFee

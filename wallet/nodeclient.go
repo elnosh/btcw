@@ -18,11 +18,11 @@ type NodeClient interface {
 	GetBlockHash(int64) (*chainhash.Hash, error)
 	GetBlockVerboseTx(*chainhash.Hash) (*btcjson.GetBlockVerboseTxResult, error)
 	SendRawTransaction(*wire.MsgTx, bool) (*chainhash.Hash, error)
-	EstimateFee(int64) float64
+	EstimateFee(int64) btcutil.Amount
 }
 
 var (
-	defaultFee float64 = 0.00005
+	defaultFee = btcutil.Amount(5)
 )
 
 type BtcdClient struct {
@@ -72,11 +72,12 @@ func (btcd *BtcdClient) SendRawTransaction(tx *wire.MsgTx, highFees bool) (*chai
 	return btcd.client.SendRawTransaction(tx, highFees)
 }
 
-func (btcd *BtcdClient) EstimateFee(numBlocks int64) float64 {
-	fee, err := btcd.client.EstimateFee(numBlocks)
-	if err != nil {
+func (btcd *BtcdClient) EstimateFee(numBlocks int64) btcutil.Amount {
+	estimateFee, err := btcd.client.EstimateFee(numBlocks)
+	if err != nil || estimateFee == 0 {
 		return defaultFee
 	}
+	fee, _ := btcutil.NewAmount(estimateFee)
 	return fee
 }
 
@@ -122,10 +123,11 @@ func (core *BitcoinCoreClient) SendRawTransaction(tx *wire.MsgTx, highFees bool)
 	return core.client.SendRawTransaction(tx, highFees)
 }
 
-func (core *BitcoinCoreClient) EstimateFee(numBlocks int64) float64 {
+func (core *BitcoinCoreClient) EstimateFee(numBlocks int64) btcutil.Amount {
 	feeRes, err := core.client.EstimateSmartFee(numBlocks, &btcjson.EstimateModeConservative)
-	if err != nil {
+	if err != nil || *feeRes.FeeRate == 0 {
 		return defaultFee
 	}
-	return *feeRes.FeeRate
+	fee, _ := btcutil.NewAmount(*feeRes.FeeRate)
+	return fee
 }
