@@ -16,12 +16,12 @@ type UTXO struct {
 	TxID           string
 	VoutIdx        uint32
 	Value          btcutil.Amount
-	ScriptPubKey   string
+	ScriptPubKey   []byte
 	Spent          bool
 	DerivationPath string // path of the key associated with this utxo
 }
 
-func NewUTXO(txid string, voutIdx uint32, value btcutil.Amount, script, path string) *UTXO {
+func NewUTXO(txid string, voutIdx uint32, value btcutil.Amount, script []byte, path string) *UTXO {
 	return &UTXO{TxID: txid, VoutIdx: voutIdx, Value: value, ScriptPubKey: script,
 		Spent: false, DerivationPath: path}
 }

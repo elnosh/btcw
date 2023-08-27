@@ -22,7 +22,7 @@ var (
 	ErrWalletNotExists = errors.New("wallet does not exist")
 )
 
-func CreateWallet() error {
+func CreateWallet(net *chaincfg.Params) error {
 	path := setupWalletDir()
 	db, err := bolt.Open(filepath.Join(path, "wallet.db"), 0600, nil)
 	if err != nil {
@@ -63,7 +63,7 @@ func CreateWallet() error {
 	fmt.Println("Next will be the master seed. Write it down and store securely. Anyone with access to the seed has access to the funds.")
 	fmt.Printf("seed: %x\n", seed)
 
-	if err = wallet.InitWalletBuckets(seed, encodedHash); err != nil {
+	if err = wallet.InitWalletBuckets(seed, encodedHash, net); err != nil {
 		return err
 	}
 
@@ -124,7 +124,7 @@ func walletExists(db *bolt.DB) bool {
 	return exists
 }
 
-func LoadWallet(testnet bool, rpcuser, rpcpass, node string) (*Wallet, error) {
+func LoadWallet(net *chaincfg.Params, rpcuser, rpcpass, node string) (*Wallet, error) {
 	path := setupWalletDir()
 	db, err := bolt.Open(filepath.Join(path, "wallet.db"), 0600, nil)
 	if err != nil {
@@ -135,34 +135,24 @@ func LoadWallet(testnet bool, rpcuser, rpcpass, node string) (*Wallet, error) {
 		return nil, ErrWalletNotExists
 	}
 
-	network := &chaincfg.TestNet3Params
-
 	var client NodeClient
 	switch node {
 	case "btcd":
-		client, err = NewBtcdClient(testnet, rpcuser, rpcpass)
+		client, err = NewBtcdClient(net, rpcuser, rpcpass)
 		if err != nil {
 			return nil, fmt.Errorf("wallet.NewBtcdClient: %w", err)
 		}
-
-		if !testnet {
-			network = &chaincfg.SimNetParams
-		}
 	case "core":
-		client, err = NewBitcoinCoreClient(testnet, rpcuser, rpcpass)
+		client, err = NewBitcoinCoreClient(net, rpcuser, rpcpass)
 		if err != nil {
 			return nil, fmt.Errorf("wallet.NewBitcoinCoreClient: %w", err)
-		}
-
-		if !testnet {
-			network = &chaincfg.RegressionNetParams
 		}
 	default:
 		return nil, fmt.Errorf("invalid node type")
 	}
 
 	addresses := make(map[address]derivationPath)
-	wallet := &Wallet{db: db, client: client, network: network, addresses: addresses}
+	wallet := &Wallet{db: db, client: client, network: net, addresses: addresses}
 
 	wallet.balance = wallet.getBalance()
 	wallet.lastExternalIdx = wallet.getLastExternalIdx()

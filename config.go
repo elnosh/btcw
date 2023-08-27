@@ -3,6 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
+
+	"github.com/btcsuite/btcd/chaincfg"
 )
 
 type Flags struct {
@@ -29,8 +31,18 @@ func parseFlags() (*Flags, error) {
 	}
 
 	if flags.Node == "core" && flags.Simnet {
-		return nil, fmt.Errorf("simnet is not available with core. For core please specify testnet or regtest")
+		return nil, fmt.Errorf("Simnet is not available with core. For core please specify testnet or regtest")
 	}
 
 	return flags, nil
+}
+
+func getNetwork(flags *Flags) *chaincfg.Params {
+	if flags.Simnet {
+		return &chaincfg.SimNetParams
+	} else if flags.Regtest {
+		return &chaincfg.RegressionNetParams
+	} else {
+		return &chaincfg.TestNet3Params
+	}
 }

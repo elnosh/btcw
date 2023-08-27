@@ -1,7 +1,6 @@
 package wallet
 
 import (
-	"encoding/hex"
 	"fmt"
 
 	"github.com/btcsuite/btcd/btcutil"
@@ -74,12 +73,7 @@ func (w *Wallet) signTransaction(tx *wire.MsgTx, utxos []tx.UTXO) error {
 			return err
 		}
 
-		prevScript, err := hex.DecodeString(utxo.ScriptPubKey)
-		if err != nil {
-			return fmt.Errorf("could not decode scriptPubKey hex: %s", err.Error())
-		}
-
-		scriptSig, err := txscript.SignatureScript(tx, i, prevScript,
+		scriptSig, err := txscript.SignatureScript(tx, i, utxo.ScriptPubKey,
 			txscript.SigHashAll, wif.PrivKey, wif.CompressPubKey)
 		if err != nil {
 			return err
@@ -93,12 +87,8 @@ func (w *Wallet) signTransaction(tx *wire.MsgTx, utxos []tx.UTXO) error {
 func validateSignedTransaction(tx *wire.MsgTx, utxos []tx.UTXO) error {
 	for i := range tx.TxIn {
 		utxo := utxos[i]
-		prevScript, err := hex.DecodeString(utxo.ScriptPubKey)
-		if err != nil {
-			return fmt.Errorf("could not decode scriptPubKey hex: %s", err.Error())
-		}
 
-		vm, err := txscript.NewEngine(prevScript, tx, i, txscript.StandardVerifyFlags, nil, nil, int64(utxo.Value), nil)
+		vm, err := txscript.NewEngine(utxo.ScriptPubKey, tx, i, txscript.StandardVerifyFlags, nil, nil, int64(utxo.Value), nil)
 		if err != nil {
 			return err
 		}
@@ -181,14 +171,19 @@ func (w *Wallet) addChangeUTXO(txMsg *wire.MsgTx, changeOutput wire.TxOut, chang
 	_, addrs, _, err := txscript.ExtractPkScriptAddrs(changeOutput.PkScript, w.network)
 	if err != nil {
 		fmt.Printf("could not extract address script info: %s", err.Error())
+		return
 	}
 	derivationPath := w.getDerivationPathForAddress(addrs[0].String())
 	if derivationPath == "" {
 		fmt.Printf("no derivation path for address: %v", addrs[0].String())
+		return
 	}
 	value := btcutil.Amount(changeOutput.Value)
-	script := string(changeOutput.PkScript)
+	script, err := txscript.ParsePkScript(changeOutput.PkScript)
+	if err != nil {
+		fmt.Printf("error parsing pkScript of change utxo: %v", err)
+	}
 
-	changeUTXO := tx.NewUTXO(txId, changeIdx, value, script, derivationPath)
+	changeUTXO := tx.NewUTXO(txId, changeIdx, value, script.Script(), derivationPath)
 	_ = w.addUTXO(*changeUTXO)
 }

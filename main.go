@@ -16,8 +16,9 @@ func main() {
 		printErr(err)
 	}
 
+	net := getNetwork(flags)
 	if flags.Create {
-		err := wallet.CreateWallet()
+		err := wallet.CreateWallet(net)
 		if err != nil {
 			printErr(err)
 		}
@@ -26,12 +27,7 @@ func main() {
 			printErr(errors.New("RPC username and password are required to start wallet"))
 		}
 
-		testnet := !flags.Simnet
-		if flags.Node == "core" {
-			testnet = !flags.Regtest
-		}
-
-		w, err := wallet.LoadWallet(testnet, flags.RPCUser, flags.RPCPass, flags.Node)
+		w, err := wallet.LoadWallet(net, flags.RPCUser, flags.RPCPass, flags.Node)
 		if err != nil {
 			if err == wallet.ErrWalletNotExists {
 				printErr(errors.New("A wallet does not exist. Please create one first with -create"))

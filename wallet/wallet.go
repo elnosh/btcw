@@ -243,7 +243,12 @@ func checkBlocks(wallet *Wallet, height int64) error {
 							return fmt.Errorf("error getting tx amount: %s", err.Error())
 						}
 
-						utxo := tx.NewUTXO(rawTx.Txid, vout.N, utxoAmount, vout.ScriptPubKey.Hex, path)
+						hexBytes, err := hex.DecodeString(vout.ScriptPubKey.Hex)
+						if err != nil {
+							return fmt.Errorf("hex.DecodeString: %v", err)
+						}
+
+						utxo := tx.NewUTXO(rawTx.Txid, vout.N, utxoAmount, hexBytes, path)
 						if err := wallet.addUTXO(*utxo); err != nil {
 							return fmt.Errorf("error adding new UTXO: %s", err.Error())
 						}

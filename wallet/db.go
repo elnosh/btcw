@@ -7,6 +7,7 @@ import (
 	"log"
 
 	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/elnosh/btcw/tx"
 	"github.com/elnosh/btcw/utils"
 	bolt "go.etcd.io/bbolt"
@@ -31,7 +32,7 @@ const (
 )
 
 // create auth, utxos, keys and wallet metadata buckets
-func (w *Wallet) InitWalletBuckets(seed []byte, encodedHash string) error {
+func (w *Wallet) InitWalletBuckets(seed []byte, encodedHash string, net *chaincfg.Params) error {
 	return w.db.Update(func(tx *bolt.Tx) error {
 		if err := createAuthBucket(tx, encodedHash); err != nil {
 			return err
@@ -44,7 +45,7 @@ func (w *Wallet) InitWalletBuckets(seed []byte, encodedHash string) error {
 		}
 
 		// derive keys to be stored
-		master, acct0ext, acct0int, err := DeriveHDKeys(seed, w.network)
+		master, acct0ext, acct0int, err := DeriveHDKeys(seed, net)
 		if err != nil {
 			return err
 		}
@@ -277,10 +278,11 @@ func (w *Wallet) getDerivationPathForAddress(address string) string {
 
 		c := keysb.Cursor()
 		for k, v := c.First(); k != nil; k, v = c.Next() {
-			if bytes.Equal(addressBytes, k) {
-				var kp KeyPair
-				_ = json.Unmarshal(v, &kp)
-				derivationPath = kp.Address
+			var kp KeyPair
+			_ = json.Unmarshal(v, &kp)
+
+			if bytes.Equal(addressBytes, []byte(kp.Address)) {
+				derivationPath = string(k)
 				break
 			}
 		}

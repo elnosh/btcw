@@ -7,6 +7,7 @@ import (
 
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/wire"
@@ -28,9 +29,9 @@ type BtcdClient struct {
 	client *rpcclient.Client
 }
 
-func NewBtcdClient(testnet bool, rpcuser, rpcpass string) (*BtcdClient, error) {
+func NewBtcdClient(net *chaincfg.Params, rpcuser, rpcpass string) (*BtcdClient, error) {
 	port := "18334"
-	if !testnet {
+	if net != &chaincfg.TestNet3Params {
 		port = "18556"
 	}
 
@@ -83,11 +84,12 @@ type BitcoinCoreClient struct {
 	client *rpcclient.Client
 }
 
-func NewBitcoinCoreClient(testnet bool, rpcuser, rpcpass string) (*BitcoinCoreClient, error) {
+func NewBitcoinCoreClient(net *chaincfg.Params, rpcuser, rpcpass string) (*BitcoinCoreClient, error) {
 	port := "18332"
-	if !testnet {
+	if net != &chaincfg.TestNet3Params {
 		port = "18443"
 	}
+
 	connCfg := &rpcclient.ConnConfig{
 		Host:         "localhost:" + port,
 		User:         rpcuser,
