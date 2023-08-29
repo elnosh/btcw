@@ -57,14 +57,14 @@ func CreateWallet(net *chaincfg.Params) error {
 
 	seed, err := hdkeychain.GenerateSeed(hdkeychain.RecommendedSeedLen)
 	if err != nil {
-		return err
+		return fmt.Errorf("error creating wallet: %v", err)
 	}
 
 	fmt.Println("Next will be the master seed. Write it down and store securely. Anyone with access to the seed has access to the funds.")
 	fmt.Printf("seed: %x\n", seed)
 
-	if err = wallet.InitWalletBuckets(seed, encodedHash, net); err != nil {
-		return err
+	if err = wallet.initWalletBuckets(seed, encodedHash, net); err != nil {
+		return fmt.Errorf("error creating wallet: %v", err)
 	}
 
 	return nil
@@ -151,8 +151,7 @@ func LoadWallet(net *chaincfg.Params, rpcuser, rpcpass, node string) (*Wallet, e
 		return nil, fmt.Errorf("invalid node type")
 	}
 
-	addresses := make(map[address]derivationPath)
-	wallet := &Wallet{db: db, client: client, network: net, addresses: addresses}
+	wallet := NewWallet(db, client, net)
 
 	wallet.balance = wallet.getBalance()
 	wallet.lastExternalIdx = wallet.getLastExternalIdx()

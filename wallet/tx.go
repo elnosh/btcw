@@ -1,8 +1,6 @@
 package wallet
 
 import (
-	"fmt"
-
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
@@ -146,6 +144,7 @@ func (w *Wallet) updateWalletAfterTx(txMsg *wire.MsgTx, usedUTXOs []tx.UTXO, amo
 // markSpentUTXOs takes a list of utxos and if it finds them in the wallet
 // it will mark them as spent
 func (w *Wallet) markSpentUTXOs(utxos []tx.UTXO) {
+	w.LogInfo("marking spent UTXOs")
 	for _, utxo := range utxos {
 		for _, walletUtxo := range w.utxos {
 			if walletUtxo.TxID == utxo.TxID {
@@ -169,18 +168,18 @@ func (w *Wallet) addChangeUTXO(txMsg *wire.MsgTx, changeOutput wire.TxOut, chang
 
 	_, addrs, _, err := txscript.ExtractPkScriptAddrs(changeOutput.PkScript, w.network)
 	if err != nil {
-		fmt.Printf("could not extract address script info: %s", err.Error())
+		w.LogError("error adding change UTXO - could not extract address script info: %s", err.Error())
 		return
 	}
 	derivationPath := w.getDerivationPathForAddress(addrs[0].String())
 	if derivationPath == "" {
-		fmt.Printf("no derivation path for address: %v", addrs[0].String())
+		w.LogError("error adding change UTXO - no derivation path for address: %s", addrs[0].String())
 		return
 	}
 	value := btcutil.Amount(changeOutput.Value)
 	script, err := txscript.ParsePkScript(changeOutput.PkScript)
 	if err != nil {
-		fmt.Printf("error parsing pkScript of change utxo: %v", err)
+		w.LogError("error adding change UTXO - could not parse pkScript of change utxo: %s", err.Error())
 	}
 
 	changeUTXO := tx.NewUTXO(txId, changeIdx, value, script.Script(), derivationPath)

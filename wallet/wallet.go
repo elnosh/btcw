@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -32,6 +32,7 @@ type Wallet struct {
 	db      *bolt.DB
 	client  NodeClient
 	network *chaincfg.Params
+	logger  *slog.Logger
 
 	utxos   []tx.UTXO
 	utxoMtx sync.Mutex
@@ -42,8 +43,16 @@ type Wallet struct {
 	lastExternalIdx  uint32
 	lastInternalIdx  uint32
 	lastScannedBlock int64
+	addresses        map[address]derivationPath // only for external addresses to track when receiving
+}
 
-	addresses map[address]derivationPath // only for external addresses to track when receiving
+func NewWallet(db *bolt.DB, client NodeClient, net *chaincfg.Params) *Wallet {
+	logger := slog.Default()
+	addresses := make(map[address]derivationPath)
+	balance := btcutil.Amount(0)
+
+	return &Wallet{db: db, client: client, network: net, logger: logger,
+		balance: balance, addresses: addresses}
 }
 
 func (w *Wallet) setLastExternalIdx(idx uint32) error {
@@ -174,6 +183,7 @@ func (w *Wallet) getPrivateKeyForUTXO(utxo tx.UTXO) (*btcutil.WIF, error) {
 }
 
 func ScanForNewBlocks(ctx context.Context, wallet *Wallet, errChan chan error) {
+	wallet.LogInfo("Scanning new blocks")
 	go func(ctx context.Context) {
 		ticker := time.NewTicker(time.Second * 30)
 		defer ticker.Stop()
@@ -185,13 +195,11 @@ func ScanForNewBlocks(ctx context.Context, wallet *Wallet, errChan chan error) {
 			case <-ticker.C:
 				height, err := wallet.client.GetBlockCount()
 				if err != nil {
-					log.Printf("error getting block count: %s", err.Error())
 					errChan <- err
 					return
 				}
 				err = checkBlocks(wallet, height)
 				if err != nil {
-					fmt.Printf("error checking blocks: %s", err.Error())
 					errChan <- err
 					return
 				}
@@ -238,6 +246,7 @@ func checkBlocks(wallet *Wallet, height int64) error {
 					// if match is found
 					// add UTXO and update wallet balance
 					if ok {
+						wallet.LogInfo("found new receiving transaction in block %s", block.Hash)
 						utxoAmount, err := btcutil.NewAmount(vout.Value)
 						if err != nil {
 							return fmt.Errorf("error getting tx amount: %s", err.Error())
@@ -257,6 +266,7 @@ func checkBlocks(wallet *Wallet, height int64) error {
 						if err := wallet.setBalance(balance); err != nil {
 							return fmt.Errorf("error setting wallet balance: %s", err.Error())
 						}
+						wallet.LogInfo("added new transaction %s to wallet", rawTx.Txid)
 					}
 				}
 
@@ -268,4 +278,14 @@ func checkBlocks(wallet *Wallet, height int64) error {
 		}
 	}
 	return nil
+}
+
+func (w *Wallet) LogInfo(format string, v ...any) {
+	msg := fmt.Sprintf(format, v...)
+	w.logger.Info(msg)
+}
+
+func (w *Wallet) LogError(format string, v ...any) {
+	msg := fmt.Sprintf(format, v...)
+	w.logger.Error(msg)
 }

@@ -2,6 +2,7 @@ package rpcserver
 
 import (
 	"fmt"
+	"log/slog"
 	"net"
 	"net/rpc"
 	"net/rpc/jsonrpc"
@@ -18,7 +19,7 @@ func StartRPCServer(wallet *wallet.Wallet) error {
 		return fmt.Errorf("error starting RPC server: %s", err.Error())
 	}
 
-	fmt.Printf("rpc server listening on: %v\n", listener.Addr())
+	slog.Info("rpc server listening on: " + listener.Addr().String())
 	for {
 		conn, err := listener.Accept()
 		if err != nil {

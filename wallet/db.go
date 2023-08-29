@@ -32,7 +32,7 @@ const (
 )
 
 // create auth, utxos, keys and wallet metadata buckets
-func (w *Wallet) InitWalletBuckets(seed []byte, encodedHash string, net *chaincfg.Params) error {
+func (w *Wallet) initWalletBuckets(seed []byte, encodedHash string, net *chaincfg.Params) error {
 	return w.db.Update(func(tx *bolt.Tx) error {
 		if err := createAuthBucket(tx, encodedHash); err != nil {
 			return err

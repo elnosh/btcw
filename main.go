@@ -32,7 +32,7 @@ func main() {
 			if err == wallet.ErrWalletNotExists {
 				printErr(errors.New("A wallet does not exist. Please create one first with -create"))
 			}
-			printErr(err)
+			printErr(fmt.Errorf("error loading wallet: %v", err))
 		}
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -43,7 +43,7 @@ func main() {
 			go wallet.ScanForNewBlocks(ctx, w, errChan)
 			err = <-errChan
 			if err != nil {
-				fmt.Println(err)
+				w.LogError(err.Error())
 			}
 		}()
 
@@ -51,6 +51,7 @@ func main() {
 		if err != nil {
 			printErr(err)
 		}
+
 	}
 }
 

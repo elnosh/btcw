@@ -1,6 +1,6 @@
 module github.com/elnosh/btcw
 
-go 1.20
+go 1.21
 
 require (
 	github.com/btcsuite/btcd v0.23.5-0.20230810220540-0aaa7c5e7b7f
