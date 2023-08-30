@@ -3,6 +3,7 @@ package tx
 import (
 	"errors"
 	"math/rand"
+	"slices"
 	"strconv"
 
 	"github.com/btcsuite/btcd/btcutil"
@@ -29,12 +30,6 @@ func NewUTXO(txid string, voutIdx uint32, value btcutil.Amount, script []byte, p
 func (utxo *UTXO) GetOutpoint() string {
 	idx := strconv.FormatUint(uint64(utxo.VoutIdx), 10)
 	return utxo.TxID + ":" + idx
-}
-
-// deletes a utxo from the slice
-func DeleteUTXO(utxos []UTXO, idx int) {
-	utxos[idx] = utxos[len(utxos)-1]
-	utxos = utxos[:len(utxos)-1]
 }
 
 // SelectUTXOs will take a desired amount to send and a list of utxos
@@ -75,16 +70,16 @@ func SelectUTXOs(amountToSend btcutil.Amount, utxos []UTXO) ([]UTXO, btcutil.Amo
 
 		// delete selected utxo so that it does not
 		// get selected again
-		DeleteUTXO(utxosCopy, idx)
+		utxosCopy = slices.Delete(utxosCopy, idx, idx+1)
 
 		if selectedAmount > amountToSend {
 			break
 		} else {
 			// if there is only 1 utxo left and amountToSend has not been
-			// reached yet, check if with last utxo value will be enough.
+			// reached yet, check if last utxo is unspent and value is enough.
 			// if it is, add it up and if not then return err
 			if len(utxosCopy) == 1 {
-				if selectedAmount+utxosCopy[0].Value > amountToSend {
+				if !utxosCopy[0].Spent && selectedAmount+utxosCopy[0].Value > amountToSend {
 					selectedAmount += utxosCopy[0].Value
 					selectedUtxos = append(selectedUtxos, utxosCopy[0])
 					break

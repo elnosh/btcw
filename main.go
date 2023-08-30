@@ -51,7 +51,6 @@ func main() {
 		if err != nil {
 			printErr(err)
 		}
-
 	}
 }
 

@@ -131,9 +131,11 @@ func (w *Wallet) updateWalletAfterTx(txMsg *wire.MsgTx, usedUTXOs []tx.UTXO, amo
 	changeOutput, changeIdx, fee := extractTxInfo(txMsg, usedUTXOs, amountToSend)
 
 	// mark utxos used to create transaction as spent
+	//go w.markSpentUTXOs(usedUTXOs)
 	go w.markSpentUTXOs(usedUTXOs)
 
 	// add change utxo to wallet utxo list
+	//go w.addChangeUTXO(txMsg, changeOutput, changeIdx)
 	go w.addChangeUTXO(txMsg, changeOutput, changeIdx)
 
 	// new balance will be current wallet balance - amount wanting to be sent - fee
@@ -146,15 +148,13 @@ func (w *Wallet) updateWalletAfterTx(txMsg *wire.MsgTx, usedUTXOs []tx.UTXO, amo
 func (w *Wallet) markSpentUTXOs(utxos []tx.UTXO) {
 	w.LogInfo("marking spent UTXOs")
 	for _, utxo := range utxos {
-		for _, walletUtxo := range w.utxos {
-			if walletUtxo.TxID == utxo.TxID {
-				// update in db and struct
-				utxo.Spent = true
+		for i := range w.utxos {
+			if w.utxos[i].TxID == utxo.TxID {
 				key := utxo.GetOutpoint()
 				err := w.updateUTXO(key, utxo)
 				// only update utxo in wallet struct if update in db succeeded
 				if err == nil {
-					walletUtxo.Spent = true
+					w.utxos[i].Spent = true
 				}
 				break
 			}

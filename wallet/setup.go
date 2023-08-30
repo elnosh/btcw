@@ -158,7 +158,7 @@ func LoadWallet(net *chaincfg.Params, rpcuser, rpcpass, node string) (*Wallet, e
 	wallet.lastInternalIdx = wallet.getLastInternalIdx()
 	wallet.lastScannedBlock = wallet.getLastScannedBlock()
 
-	err = wallet.loadAddresses()
+	err = wallet.loadExternalAddresses()
 	if err != nil {
 		return nil, err
 	}

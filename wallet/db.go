@@ -292,7 +292,7 @@ func (w *Wallet) getDerivationPathForAddress(address string) string {
 	return derivationPath
 }
 
-func (w *Wallet) loadAddresses() error {
+func (w *Wallet) loadExternalAddresses() error {
 	if err := w.db.View(func(tx *bolt.Tx) error {
 		keysb := tx.Bucket([]byte(keysBucket))
 
@@ -302,7 +302,10 @@ func (w *Wallet) loadAddresses() error {
 			if err := json.Unmarshal(v, &kp); err != nil {
 				return fmt.Errorf("error loading addresses: %s", err.Error())
 			}
-			w.addresses[kp.Address] = string(k)
+			// add only external addresses
+			if bytes.Contains(k, []byte("m/44'/1'/0'/0")) {
+				w.addresses[kp.Address] = string(k)
+			}
 		}
 		return nil
 	}); err != nil {
