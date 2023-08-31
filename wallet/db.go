@@ -14,14 +14,16 @@ import (
 )
 
 const (
-	// bucket names
+	// buckets
 	authBucket           = "auth"
 	utxosBucket          = "utxos"
 	keysBucket           = "keys"
 	walletMetadataBucket = "wallet_metadata"
 
-	// constant keys
-	encodedHashKey      = "encoded_hash"
+	// constant key in auth bucket
+	encodedHashKey = "encoded_hash"
+
+	// constant keys in wallet metadata bucket
 	balanceKey          = "balance"
 	masterSeedKey       = "master_seed"
 	account0ExternelKey = "account_0_external"
@@ -44,13 +46,13 @@ func (w *Wallet) initWalletBuckets(seed []byte, encodedHash string, net *chaincf
 			return err
 		}
 
-		// derive keys to be stored
+		// derive HD keys to be stored
 		master, acct0ext, acct0int, err := DeriveHDKeys(seed, net)
 		if err != nil {
 			return err
 		}
 
-		// decoded hash to get passkey
+		// decode hash to get passkey that will be used to encrypt HD keys
 		_, key, _, err := utils.DecodeHash(encodedHash)
 		if err != nil {
 			return err
@@ -94,15 +96,6 @@ func createWalletMetadataBucket(tx *bolt.Tx, encryptedMaster, encryptedAcct0ext,
 		return err
 	}
 
-	if err = wallet.Put([]byte(balanceKey), utils.Int64ToBytes(0)); err != nil {
-		return err
-	}
-
-	if err = wallet.Put([]byte(lastScannedBlockKey), utils.Int64ToBytes(0)); err != nil {
-		return err
-	}
-
-	// set derivation paths needed
 	if err = wallet.Put([]byte(masterSeedKey), encryptedMaster); err != nil {
 		return err
 	}
@@ -112,10 +105,16 @@ func createWalletMetadataBucket(tx *bolt.Tx, encryptedMaster, encryptedAcct0ext,
 	if err = wallet.Put([]byte(account0InternalKey), encryptedAcct0int); err != nil {
 		return err
 	}
+	if err = wallet.Put([]byte(balanceKey), utils.Int64ToBytes(0)); err != nil {
+		return err
+	}
 	if err = wallet.Put([]byte(lastExternalIdxKey), utils.Uint32ToBytes(0)); err != nil {
 		return err
 	}
 	if err = wallet.Put([]byte(lastInternalIdxKey), utils.Uint32ToBytes(0)); err != nil {
+		return err
+	}
+	if err = wallet.Put([]byte(lastScannedBlockKey), utils.Int64ToBytes(0)); err != nil {
 		return err
 	}
 
@@ -176,6 +175,8 @@ func (w Wallet) getLastScannedBlock() int64 {
 	return lastScannedBlock
 }
 
+// getAcct0External retrieves the extended key for external chain
+// it can then be used to generate an external address
 func (w Wallet) getAcct0External() []byte {
 	var encryptedAcct0ext []byte
 	w.db.View(func(tx *bolt.Tx) error {
@@ -186,6 +187,8 @@ func (w Wallet) getAcct0External() []byte {
 	return encryptedAcct0ext
 }
 
+// getAcct0Internal retrieves the extended key for internal chain
+// it can then be used to generate an internal addresses for change outputs
 func (w Wallet) getAcct0Internal() []byte {
 	var encryptedAcct0internal []byte
 	w.db.View(func(tx *bolt.Tx) error {
@@ -292,6 +295,8 @@ func (w *Wallet) getDerivationPathForAddress(address string) string {
 	return derivationPath
 }
 
+// loadExternalAddresses loads addresses generated from external chain
+// into the wallet addresses map
 func (w *Wallet) loadExternalAddresses() error {
 	if err := w.db.View(func(tx *bolt.Tx) error {
 		keysb := tx.Bucket([]byte(keysBucket))
@@ -302,7 +307,7 @@ func (w *Wallet) loadExternalAddresses() error {
 			if err := json.Unmarshal(v, &kp); err != nil {
 				return fmt.Errorf("error loading addresses: %s", err.Error())
 			}
-			// add only external addresses
+			// check to add only external addresses
 			if bytes.Contains(k, []byte("m/44'/1'/0'/0")) {
 				w.addresses[kp.Address] = string(k)
 			}

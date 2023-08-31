@@ -114,13 +114,14 @@ func (w *Wallet) addKey(derivationPath string, key *KeyPair) error {
 	return nil
 }
 
+// getDecodedKey retrieves the hashed passphrase from db
+// and decodes it.
 func (w *Wallet) getDecodedKey() ([]byte, error) {
 	encodedHash := w.getEncodedHash()
 	if encodedHash == nil {
 		return nil, errors.New("encoded hash not found")
 	}
 
-	// decode hash to get key
 	_, key, _, err := utils.DecodeHash(string(encodedHash))
 	if err != nil {
 		return nil, fmt.Errorf("error decoding key: %v", err)

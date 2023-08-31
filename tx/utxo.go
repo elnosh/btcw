@@ -11,6 +11,7 @@ import (
 
 var (
 	ErrInsufficientAmount = errors.New("not enough value in utxos to fulfill amount")
+	ErrNoUTXOs            = errors.New("no utxos to select")
 )
 
 type UTXO struct {
@@ -43,7 +44,7 @@ func SelectUTXOs(amountToSend btcutil.Amount, utxos []UTXO) ([]UTXO, btcutil.Amo
 	copy(utxosCopy, utxos)
 
 	if len(utxos) == 0 {
-		return nil, 0, errors.New("no utxos to select")
+		return nil, 0, ErrNoUTXOs
 	} else if len(utxos) == 1 {
 		utxosAmount := utxos[0].Value
 		if utxosAmount > amountToSend {
@@ -89,6 +90,5 @@ func SelectUTXOs(amountToSend btcutil.Amount, utxos []UTXO) ([]UTXO, btcutil.Amo
 			}
 		}
 	}
-
 	return selectedUtxos, selectedAmount, nil
 }

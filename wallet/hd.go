@@ -9,7 +9,7 @@ import (
 	"github.com/elnosh/btcw/utils"
 )
 
-// derive keys for initial HD wallet setup - BIP-44
+// DeriveHDKeys derives the keys for initial HD wallet setup - BIP-44
 // that will be external and internal chain for first account
 // external chain path: m/44'/1'/0'/0
 // internal chain path: m/44'/1'/0'/1
@@ -59,6 +59,7 @@ func DeriveHDKeys(seed []byte, net *chaincfg.Params) (master, acct0ext,
 	return master, acct0ext, acct0int, nil
 }
 
+// EncryptHDKeys encrypts the HD keys derived from DeriveHDKeys
 func EncryptHDKeys(key []byte, master, acct0ext, acct0int *hdkeychain.ExtendedKey) (encryptedMaster,
 	encryptedAcct0ext, encryptedAcct0int []byte, err error) {
 	encryptedMaster, err = utils.Encrypt([]byte(master.String()), key)
@@ -79,7 +80,8 @@ func EncryptHDKeys(key []byte, master, acct0ext, acct0int *hdkeychain.ExtendedKe
 	return encryptedMaster, encryptedAcct0ext, encryptedAcct0int, nil
 }
 
-// fromAcctKey which could be either external or internal, derive next key
+// DeriveNextHDKey will derive the next child key from fromAcctKey
+// which could be either for external or internal chain
 func DeriveNextHDKey(fromAcctKey []byte, idx uint32) (*hdkeychain.ExtendedKey, error) {
 	acctExtendedKey, err := hdkeychain.NewKeyFromString(string(fromAcctKey))
 	if err != nil {
