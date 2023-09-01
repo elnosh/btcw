@@ -19,6 +19,7 @@ type NodeClient interface {
 	GetBlockVerboseTx(*chainhash.Hash) (*btcjson.GetBlockVerboseTxResult, error)
 	SendRawTransaction(*wire.MsgTx, bool) (*chainhash.Hash, error)
 	EstimateFee(int64) btcutil.Amount
+	LoadTxFilter(bool, []btcutil.Address, []wire.OutPoint) error
 }
 
 var (
@@ -29,29 +30,41 @@ type BtcdClient struct {
 	client *rpcclient.Client
 }
 
-func NewBtcdClient(net *chaincfg.Params, rpcuser, rpcpass string) (*BtcdClient, error) {
+func NewBtcdClient(wallet *Wallet, net *chaincfg.Params, rpcuser, rpcpass string) (*BtcdClient, error) {
 	port := "18334"
 	if net != &chaincfg.TestNet3Params {
 		port = "18556"
 	}
 
-	certHomeDir := btcutil.AppDataDir("btcd", false)
-	certs, err := os.ReadFile(filepath.Join(certHomeDir, "rpc.cert"))
+	// notification handler for when new block is added to the chain
+	ntfnHandlers := rpcclient.NotificationHandlers{
+		OnFilteredBlockConnected: func(height int32, header *wire.BlockHeader, txs []*btcutil.Tx) {
+			go wallet.scanBlockTxs(header.BlockHash().String(), txs)
+		},
+	}
+
+	btcdHomeDir := btcutil.AppDataDir("btcd", false)
+	certs, err := os.ReadFile(filepath.Join(btcdHomeDir, "rpc.cert"))
 	if err != nil {
 		return nil, fmt.Errorf("os.ReadFile: %v", err)
 	}
 	connCfg := &rpcclient.ConnConfig{
 		Host:         "localhost:" + port,
+		Endpoint:     "ws",
 		User:         rpcuser,
 		Pass:         rpcpass,
 		Certificates: certs,
-		HTTPPostMode: true,
 	}
 
-	client, err := rpcclient.New(connCfg, nil)
+	client, err := rpcclient.New(connCfg, &ntfnHandlers)
 	if err != nil {
 		return nil, fmt.Errorf("rpcclient.New: %v", err)
 	}
+
+	if err := client.NotifyBlocks(); err != nil {
+		return nil, fmt.Errorf("client.NotifyBlocks: %v", err)
+	}
+
 	btcdClient := &BtcdClient{client: client}
 	return btcdClient, nil
 }
@@ -79,6 +92,10 @@ func (btcd *BtcdClient) EstimateFee(numBlocks int64) btcutil.Amount {
 	}
 	fee, _ := btcutil.NewAmount(estimateFee)
 	return fee
+}
+
+func (btcd *BtcdClient) LoadTxFilter(reload bool, addresses []btcutil.Address, outpoints []wire.OutPoint) error {
+	return btcd.client.LoadTxFilter(reload, addresses, outpoints)
 }
 
 type BitcoinCoreClient struct {
@@ -130,4 +147,8 @@ func (core *BitcoinCoreClient) EstimateFee(numBlocks int64) btcutil.Amount {
 	}
 	fee, _ := btcutil.NewAmount(*feeRes.FeeRate)
 	return fee
+}
+
+func (core *BitcoinCoreClient) LoadTxFilter(reload bool, addresses []btcutil.Address, outpoints []wire.OutPoint) error {
+	return nil
 }

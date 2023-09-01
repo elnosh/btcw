@@ -38,14 +38,16 @@ func main() {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		go func() {
-			errChan := make(chan error)
-			go wallet.ScanForNewBlocks(ctx, w, errChan)
-			err = <-errChan
-			if err != nil {
-				w.LogError(err.Error())
-			}
-		}()
+		if flags.Node == "core" {
+			go func() {
+				errChan := make(chan error)
+				go wallet.ScanForNewBlocks(ctx, w, errChan)
+				err = <-errChan
+				if err != nil {
+					w.LogError(err.Error())
+				}
+			}()
+		}
 
 		err = rpcserver.StartRPCServer(w)
 		if err != nil {

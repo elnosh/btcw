@@ -135,10 +135,12 @@ func LoadWallet(net *chaincfg.Params, rpcuser, rpcpass, node string) (*Wallet, e
 		return nil, ErrWalletNotExists
 	}
 
+	wallet := NewWallet(db, net)
+
 	var client NodeClient
 	switch node {
 	case "btcd":
-		client, err = NewBtcdClient(net, rpcuser, rpcpass)
+		client, err = NewBtcdClient(wallet, net, rpcuser, rpcpass)
 		if err != nil {
 			return nil, fmt.Errorf("wallet.NewBtcdClient: %w", err)
 		}
@@ -151,8 +153,7 @@ func LoadWallet(net *chaincfg.Params, rpcuser, rpcpass, node string) (*Wallet, e
 		return nil, fmt.Errorf("invalid node type")
 	}
 
-	wallet := NewWallet(db, client, net)
-
+	wallet.client = client
 	wallet.balance = wallet.getBalance()
 	wallet.lastExternalIdx = wallet.getLastExternalIdx()
 	wallet.lastInternalIdx = wallet.getLastInternalIdx()
@@ -164,6 +165,11 @@ func LoadWallet(net *chaincfg.Params, rpcuser, rpcpass, node string) (*Wallet, e
 	}
 
 	err = wallet.loadUTXOs()
+	if err != nil {
+		return nil, err
+	}
+
+	err = wallet.loadTxFilter()
 	if err != nil {
 		return nil, err
 	}
