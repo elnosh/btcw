@@ -1,6 +1,8 @@
 package wallet
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,6 +13,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/libsv/go-bn/zmq"
 )
 
 type NodeClient interface {
@@ -24,6 +27,10 @@ type NodeClient interface {
 
 var (
 	defaultFee = btcutil.Amount(5)
+)
+
+var (
+	ErrZMQNotEnabled = errors.New("ZeroMQ is not enabled")
 )
 
 type BtcdClient struct {
@@ -121,7 +128,7 @@ type BitcoinCoreClient struct {
 	client *rpcclient.Client
 }
 
-func NewBitcoinCoreClient(net *chaincfg.Params, rpcuser, rpcpass string) (*BitcoinCoreClient, error) {
+func NewBitcoinCoreClient(wallet *Wallet, net *chaincfg.Params, rpcuser, rpcpass string) (*BitcoinCoreClient, error) {
 	port := "18332"
 	if net != &chaincfg.TestNet3Params {
 		port = "18443"
@@ -139,7 +146,14 @@ func NewBitcoinCoreClient(net *chaincfg.Params, rpcuser, rpcpass string) (*Bitco
 	if err != nil {
 		return nil, fmt.Errorf("rpcclient.New: %v", err)
 	}
+
 	coreClient := &BitcoinCoreClient{client: client}
+
+	err = subscribeZeroMQNotifications(wallet, coreClient)
+	if err != nil {
+		// if err with ZeroMQ notifcations, sync manually
+	}
+
 	return coreClient, nil
 }
 
@@ -169,5 +183,36 @@ func (core *BitcoinCoreClient) EstimateFee(numBlocks int64) btcutil.Amount {
 }
 
 func (core *BitcoinCoreClient) LoadTxFilter(reload bool, addresses []btcutil.Address, outpoints []wire.OutPoint) error {
+	return nil
+}
+
+func subscribeZeroMQNotifications(wallet *Wallet, core *BitcoinCoreClient) error {
+	zmqNotifications, err := core.client.GetZmqNotifications()
+	if err != nil || len(zmqNotifications) == 0 {
+		return ErrZMQNotEnabled
+	}
+
+	for _, notification := range zmqNotifications {
+		addr := notification.Address.String()
+
+		z := zmq.NewNodeMQ(zmq.WithHost(addr))
+		if err := z.SubscribeHashBlock(func(_ context.Context, hashStr string) {
+			wallet.LogInfo("received new block with id: %s", hashStr)
+			hash, err := chainhash.NewHashFromStr(hashStr)
+			if err != nil {
+				wallet.LogError("error decoding hash string: %v", err)
+			}
+			wallet.LogInfo("scanning block received")
+			go scanBlock(wallet, hash)
+		}); err != nil {
+			wallet.LogError("error with ZeroMQ notifications: %v", err)
+		}
+
+		go func() {
+			fmt.Println(z.Connect())
+		}()
+
+	}
+
 	return nil
 }

@@ -145,7 +145,7 @@ func LoadWallet(net *chaincfg.Params, rpcuser, rpcpass, node string) (*Wallet, e
 			return nil, fmt.Errorf("wallet.NewBtcdClient: %w", err)
 		}
 	case "core":
-		client, err = NewBitcoinCoreClient(net, rpcuser, rpcpass)
+		client, err = NewBitcoinCoreClient(wallet, net, rpcuser, rpcpass)
 		if err != nil {
 			return nil, fmt.Errorf("wallet.NewBitcoinCoreClient: %w", err)
 		}
