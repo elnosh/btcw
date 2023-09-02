@@ -94,6 +94,25 @@ func (btcd *BtcdClient) EstimateFee(numBlocks int64) btcutil.Amount {
 	return fee
 }
 
+// loadTxFilter sends the list of wallet external addresses
+// in the loadtxfilter RPC call. This is specific to btcd.
+// to be used whenever a new address is generated so that
+// btcd notifcations will add the new address to the filter
+func (w *Wallet) loadTxFilter() error {
+	addrs := make([]btcutil.Address, len(w.addresses))
+	i := 0
+	for k := range w.addresses {
+		addr, _ := btcutil.DecodeAddress(k, w.network)
+		addrs[i] = addr
+		i++
+	}
+
+	if err := w.client.LoadTxFilter(true, addrs, []wire.OutPoint{}); err != nil {
+		return fmt.Errorf("client.LoadTxFilter: %v", err)
+	}
+	return nil
+}
+
 func (btcd *BtcdClient) LoadTxFilter(reload bool, addresses []btcutil.Address, outpoints []wire.OutPoint) error {
 	return btcd.client.LoadTxFilter(reload, addresses, outpoints)
 }
