@@ -6,18 +6,38 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/elnosh/btcw/tx"
 )
 
+// scanMissingBlocks will look at the last scanned block and the current
+// height of the blockchain and scan any missing blocks if needed
+func (w *Wallet) scanMissingBlocks() {
+	height, err := w.client.GetBlockCount()
+	if err != nil {
+		w.LogError("error scanning blockchain - could not get block count: %v", err)
+		return
+	}
+
+	for w.lastScannedBlock < height {
+		nextBlockHash, err := w.client.GetBlockHash(w.lastScannedBlock + 1)
+		if err != nil {
+			w.LogError("error scanning blockchain - could not get block hash: %v", err)
+		}
+
+		w.scanBlock(nextBlockHash)
+	}
+}
+
 // scanBlockTxs scans the new block received for addresses owned by
 // wallet and adds UTXOs to wallet and updates balance.
 // This is called by btcd notification handler setup for when
 // new blocks are added to the blockchain
 func (w *Wallet) scanBlockTxs(blockHash string, txsInBlock []*btcutil.Tx) {
-	w.LogInfo("scanning block received")
+	w.LogInfo("scanning block %s", blockHash)
 	for _, txb := range txsInBlock {
 		for voutIdx, txOut := range txb.MsgTx().TxOut {
 			script, err := txscript.ParsePkScript(txOut.PkScript)
@@ -51,11 +71,12 @@ func (w *Wallet) scanBlockTxs(blockHash string, txsInBlock []*btcutil.Tx) {
 			}
 		}
 	}
-	w.LogInfo("finished scanning block")
+	w.setLastScannedBlock(w.lastScannedBlock + 1)
+	w.LogInfo("finished scanning block %s", blockHash)
 }
 
-// ScanForNewBlocks used when node is bitcoin core
-func ScanForNewBlocks(ctx context.Context, wallet *Wallet, errChan chan error) {
+// scanForNewBlocks used when node is bitcoin core
+func scanForNewBlocks(ctx context.Context, wallet *Wallet, errChan chan error) {
 	wallet.LogInfo("Scanning for new blocks")
 	go func(ctx context.Context) {
 		ticker := time.NewTicker(time.Second * 30)
@@ -71,94 +92,91 @@ func ScanForNewBlocks(ctx context.Context, wallet *Wallet, errChan chan error) {
 					errChan <- err
 					return
 				}
-				err = checkBlocks(wallet, height)
-				if err != nil {
-					errChan <- err
-					return
+				// if there are any new blocks, scan them
+				for wallet.lastScannedBlock < height {
+					nextBlockHash, err := wallet.client.GetBlockHash(wallet.lastScannedBlock + 1)
+					if err != nil {
+						errChan <- fmt.Errorf("error getting block hash: %v", err)
+					}
+
+					wallet.scanBlock(nextBlockHash)
 				}
 			}
 		}
 	}(ctx)
 }
 
-// check for new blocks
-// it will look for UTXOs for addresses owned by wallet
-// if finds any, it will update wallet UTXOs, balance, last fields
-func checkBlocks(wallet *Wallet, height int64) error {
-	for wallet.lastScannedBlock < height {
-		// get hash of next block to scan
-		nextBlockHash, err := wallet.client.GetBlockHash(wallet.lastScannedBlock + 1)
-		if err != nil {
-			return fmt.Errorf("error getting block hash: %s", err.Error())
-		}
-
-		err = scanBlock(wallet, nextBlockHash)
-		if err != nil {
-
-		}
-	}
-	return nil
-}
-
-func scanBlock(wallet *Wallet, blockHash *chainhash.Hash) error {
+func (w *Wallet) scanBlock(blockHash *chainhash.Hash) {
+	hashstr := blockHash.String()
+	w.LogInfo("scanning block %s", hashstr)
 	// get block info
-	block, err := wallet.client.GetBlockVerboseTx(blockHash)
+	block, err := w.client.GetBlockVerboseTx(blockHash)
 	if err != nil {
-		wallet.LogError("error getting block: %v", err)
-		return fmt.Errorf("error getting block: %s", err.Error())
+		w.LogError("error getting block: %v", err)
+		return
 	}
 
-	txsInBlock := block.Tx
+	// there is a difference between btcd and bitcoin core
+	// in the []TxRawResult returned from GetBlockVerboseTx call.
+	// if node is btcd use RawTx field, if core then use Tx field
+	var txsInBlock []btcjson.TxRawResult
+	switch v := w.client.(type) {
+	case *BtcdClient:
+		txsInBlock = block.RawTx
+	case *BitcoinCoreClient:
+		txsInBlock = block.Tx
+	default:
+		w.LogError("invalid client type: %T", v)
+	}
+
 	for _, rawTx := range txsInBlock {
 		for _, vout := range rawTx.Vout {
 			script, err := hex.DecodeString(vout.ScriptPubKey.Hex)
 			if err != nil {
-				wallet.LogError("error decoding hex script: %s", err.Error())
-				return fmt.Errorf("error decoding hex script: %s", err.Error())
+				w.LogError("error decoding hex script: %v", err)
+				return
 			}
 
 			// this will extract the address from the script
-			class, addrs, _, err := txscript.ExtractPkScriptAddrs(script, wallet.network)
+			class, addrs, _, err := txscript.ExtractPkScriptAddrs(script, w.network)
 			if err != nil {
-				wallet.LogError("error extractring address script info: %s", err.Error())
-				return fmt.Errorf("error extractring address script info: %s", err.Error())
+				w.LogError("error extractring address script info: %v", err)
+				return
 			}
 
 			// only handling pub key hash for now
 			if class == txscript.PubKeyHashTy {
 				// check if address extracted from script is in wallet
 				addr := addrs[0].String()
-				path, ok := wallet.addresses[addr]
+				path, ok := w.addresses[addr]
 				// if match is found
 				// add UTXO and update wallet balance
 				if ok {
-					wallet.LogInfo("found new receiving transaction in block %s", block.Hash)
+					w.LogInfo("found new receiving transaction in block %s", block.Hash)
 					utxoAmount, err := btcutil.NewAmount(vout.Value)
 					if err != nil {
-						wallet.LogError("error getting tx amount: %s", err.Error())
-						return fmt.Errorf("error getting tx amount: %s", err.Error())
+						w.LogError("error getting tx amount: %v", err)
+						return
 					}
 
 					utxo := tx.NewUTXO(rawTx.Txid, vout.N, utxoAmount, script, path)
-					if err := wallet.addUTXO(*utxo); err != nil {
-						wallet.LogError("error adding new UTXO: %s", err.Error())
-						return fmt.Errorf("error adding new UTXO: %s", err.Error())
+					if err := w.addUTXO(*utxo); err != nil {
+						w.LogError("error adding new UTXO: %v", err)
+						return
 					}
 
-					balance := wallet.balance + utxoAmount
-					if err := wallet.setBalance(balance); err != nil {
-						wallet.LogError("error setting wallet balance: %s", err.Error())
-						return fmt.Errorf("error setting wallet balance: %s", err.Error())
+					balance := w.balance + utxoAmount
+					if err := w.setBalance(balance); err != nil {
+						w.LogError("error setting wallet balance: %v", err)
+						return
 					}
-					wallet.LogInfo("added new transaction %s to wallet", rawTx.Txid)
+					w.LogInfo("added new transaction %s to wallet", rawTx.Txid)
 				}
 			}
 
 		}
 	}
 	// increase last scanned block
-	if err := wallet.setLastScannedBlock(wallet.lastScannedBlock + 1); err != nil {
-		return fmt.Errorf("error setting last scanned block: %s", err.Error())
-	}
-	return nil
+	w.setLastScannedBlock(w.lastScannedBlock + 1)
+	w.LogInfo("finished scanning block %s", hashstr)
 }

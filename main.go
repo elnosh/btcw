@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -33,20 +32,6 @@ func main() {
 				printErr(errors.New("A wallet does not exist. Please create one first with -create"))
 			}
 			printErr(fmt.Errorf("error loading wallet: %v", err))
-		}
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		if flags.Node == "core" {
-			go func() {
-				errChan := make(chan error)
-				go wallet.ScanForNewBlocks(ctx, w, errChan)
-				err = <-errChan
-				if err != nil {
-					w.LogError(err.Error())
-				}
-			}()
 		}
 
 		err = rpcserver.StartRPCServer(w)

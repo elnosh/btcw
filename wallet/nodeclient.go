@@ -37,7 +37,7 @@ type BtcdClient struct {
 	client *rpcclient.Client
 }
 
-func NewBtcdClient(wallet *Wallet, net *chaincfg.Params, rpcuser, rpcpass string) (*BtcdClient, error) {
+func SetupBtcdClient(wallet *Wallet, net *chaincfg.Params, rpcuser, rpcpass string) (*BtcdClient, error) {
 	port := "18334"
 	if net != &chaincfg.TestNet3Params {
 		port = "18556"
@@ -46,7 +46,9 @@ func NewBtcdClient(wallet *Wallet, net *chaincfg.Params, rpcuser, rpcpass string
 	// notification handler for when new block is added to the chain
 	ntfnHandlers := rpcclient.NotificationHandlers{
 		OnFilteredBlockConnected: func(height int32, header *wire.BlockHeader, txs []*btcutil.Tx) {
-			go wallet.scanBlockTxs(header.BlockHash().String(), txs)
+			blockhash := header.BlockHash().String()
+			wallet.LogInfo("received new block with id: %s", blockhash)
+			go wallet.scanBlockTxs(blockhash, txs)
 		},
 	}
 
@@ -68,9 +70,13 @@ func NewBtcdClient(wallet *Wallet, net *chaincfg.Params, rpcuser, rpcpass string
 		return nil, fmt.Errorf("rpcclient.New: %v", err)
 	}
 
-	if err := client.NotifyBlocks(); err != nil {
-		return nil, fmt.Errorf("client.NotifyBlocks: %v", err)
-	}
+	go func() {
+		// scan blocks added to the blockchain while wallet server was not up
+		wallet.scanMissingBlocks()
+
+		// setup btcd notifications for when new block is added
+		client.NotifyBlocks()
+	}()
 
 	btcdClient := &BtcdClient{client: client}
 	return btcdClient, nil
@@ -128,7 +134,7 @@ type BitcoinCoreClient struct {
 	client *rpcclient.Client
 }
 
-func NewBitcoinCoreClient(wallet *Wallet, net *chaincfg.Params, rpcuser, rpcpass string) (*BitcoinCoreClient, error) {
+func SetupBitcoinCoreClient(wallet *Wallet, net *chaincfg.Params, rpcuser, rpcpass string) (*BitcoinCoreClient, error) {
 	port := "18332"
 	if net != &chaincfg.TestNet3Params {
 		port = "18443"
@@ -149,10 +155,27 @@ func NewBitcoinCoreClient(wallet *Wallet, net *chaincfg.Params, rpcuser, rpcpass
 
 	coreClient := &BitcoinCoreClient{client: client}
 
-	err = subscribeZeroMQNotifications(wallet, coreClient)
-	if err != nil {
+	go func() {
+		// scan blocks added to the blockchain while wallet server was not up
+		wallet.scanMissingBlocks()
+
+		// setup ZeroMQ notifications for new blocks added
+		err = subscribeZeroMQNotifications(wallet, coreClient)
 		// if err with ZeroMQ notifcations, sync manually
-	}
+		if err != nil {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			go func() {
+				errChan := make(chan error)
+				go scanForNewBlocks(ctx, wallet, errChan)
+				err = <-errChan
+				if err != nil {
+					wallet.LogError("error scanning blockchain: %v", err)
+				}
+			}()
+		}
+	}()
 
 	return coreClient, nil
 }
@@ -198,12 +221,11 @@ func subscribeZeroMQNotifications(wallet *Wallet, core *BitcoinCoreClient) error
 		z := zmq.NewNodeMQ(zmq.WithHost(addr))
 		if err := z.SubscribeHashBlock(func(_ context.Context, hashStr string) {
 			wallet.LogInfo("received new block with id: %s", hashStr)
-			hash, err := chainhash.NewHashFromStr(hashStr)
+			blockhash, err := chainhash.NewHashFromStr(hashStr)
 			if err != nil {
 				wallet.LogError("error decoding hash string: %v", err)
 			}
-			wallet.LogInfo("scanning block received")
-			go scanBlock(wallet, hash)
+			go wallet.scanBlock(blockhash)
 		}); err != nil {
 			wallet.LogError("error with ZeroMQ notifications: %v", err)
 		}

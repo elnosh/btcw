@@ -136,24 +136,6 @@ func LoadWallet(net *chaincfg.Params, rpcuser, rpcpass, node string) (*Wallet, e
 	}
 
 	wallet := NewWallet(db, net)
-
-	var client NodeClient
-	switch node {
-	case "btcd":
-		client, err = NewBtcdClient(wallet, net, rpcuser, rpcpass)
-		if err != nil {
-			return nil, fmt.Errorf("wallet.NewBtcdClient: %w", err)
-		}
-	case "core":
-		client, err = NewBitcoinCoreClient(wallet, net, rpcuser, rpcpass)
-		if err != nil {
-			return nil, fmt.Errorf("wallet.NewBitcoinCoreClient: %w", err)
-		}
-	default:
-		return nil, fmt.Errorf("invalid node type")
-	}
-
-	wallet.client = client
 	wallet.balance = wallet.getBalance()
 	wallet.lastExternalIdx = wallet.getLastExternalIdx()
 	wallet.lastInternalIdx = wallet.getLastInternalIdx()
@@ -168,6 +150,23 @@ func LoadWallet(net *chaincfg.Params, rpcuser, rpcpass, node string) (*Wallet, e
 	if err != nil {
 		return nil, err
 	}
+
+	var client NodeClient
+	switch node {
+	case "btcd":
+		client, err = SetupBtcdClient(wallet, net, rpcuser, rpcpass)
+		if err != nil {
+			return nil, fmt.Errorf("wallet.NewBtcdClient: %w", err)
+		}
+	case "core":
+		client, err = SetupBitcoinCoreClient(wallet, net, rpcuser, rpcpass)
+		if err != nil {
+			return nil, fmt.Errorf("wallet.NewBitcoinCoreClient: %w", err)
+		}
+	default:
+		return nil, fmt.Errorf("invalid node type")
+	}
+	wallet.client = client
 
 	err = wallet.loadTxFilter()
 	if err != nil {
