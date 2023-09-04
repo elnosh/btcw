@@ -23,7 +23,7 @@ var (
 )
 
 func CreateWallet(net *chaincfg.Params) error {
-	path := setupWalletDir()
+	path := setupWalletDir(net)
 	db, err := bolt.Open(filepath.Join(path, "wallet.db"), 0600, nil)
 	if err != nil {
 		return errors.New("error setting wallet")
@@ -93,12 +93,13 @@ func promptPassphrase() (string, error) {
 	return encodedHash, nil
 }
 
-func setupWalletDir() string {
+func setupWalletDir(net *chaincfg.Params) string {
 	homedir, err := os.UserHomeDir()
 	if err != nil {
 		log.Fatal(err)
 	}
-	path := filepath.Join(homedir, ".btcw", "wallet")
+
+	path := filepath.Join(homedir, ".btcw", net.Name, "wallet")
 	err = os.MkdirAll(path, 0700)
 	if err != nil {
 		log.Fatal(err)
@@ -125,7 +126,7 @@ func walletExists(db *bolt.DB) bool {
 }
 
 func LoadWallet(net *chaincfg.Params, rpcuser, rpcpass, node string) (*Wallet, error) {
-	path := setupWalletDir()
+	path := setupWalletDir(net)
 	db, err := bolt.Open(filepath.Join(path, "wallet.db"), 0600, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error opening db: %v", err)
