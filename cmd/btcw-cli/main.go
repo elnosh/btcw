@@ -15,6 +15,7 @@ func main() {
 			getBalanceCmd,
 			getNewAddressCmd,
 			sendToAddressCmd,
+			walletPassphraseCmd,
 		},
 	}
 

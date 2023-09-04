@@ -37,7 +37,6 @@ func (w *Wallet) scanMissingBlocks() {
 // This is called by btcd notification handler setup for when
 // new blocks are added to the blockchain
 func (w *Wallet) scanBlockTxs(blockHash string, txsInBlock []*btcutil.Tx) {
-	w.LogInfo("scanning block %s", blockHash)
 	for _, txb := range txsInBlock {
 		for voutIdx, txOut := range txb.MsgTx().TxOut {
 			script, err := txscript.ParsePkScript(txOut.PkScript)
@@ -50,7 +49,8 @@ func (w *Wallet) scanBlockTxs(blockHash string, txsInBlock []*btcutil.Tx) {
 				w.LogError("error scanning block - could not get address: %v", err)
 			}
 
-			path, ok := w.addresses[addr.String()]
+			addrStr := addr.String()
+			path, ok := w.addresses[addrStr]
 			// if ok, output found that sends to address owned by wallet
 			if ok {
 				w.LogInfo("found new receiving transaction in block %s", blockHash)
@@ -72,7 +72,6 @@ func (w *Wallet) scanBlockTxs(blockHash string, txsInBlock []*btcutil.Tx) {
 		}
 	}
 	w.setLastScannedBlock(w.lastScannedBlock + 1)
-	w.LogInfo("finished scanning block %s", blockHash)
 }
 
 // scanForNewBlocks used when node is bitcoin core
@@ -107,8 +106,6 @@ func scanForNewBlocks(ctx context.Context, wallet *Wallet, errChan chan error) {
 }
 
 func (w *Wallet) scanBlock(blockHash *chainhash.Hash) {
-	hashstr := blockHash.String()
-	w.LogInfo("scanning block %s", hashstr)
 	// get block info
 	block, err := w.client.GetBlockVerboseTx(blockHash)
 	if err != nil {
@@ -178,5 +175,4 @@ func (w *Wallet) scanBlock(blockHash *chainhash.Hash) {
 	}
 	// increase last scanned block
 	w.setLastScannedBlock(w.lastScannedBlock + 1)
-	w.LogInfo("finished scanning block %s", hashstr)
 }

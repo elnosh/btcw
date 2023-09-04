@@ -140,6 +140,7 @@ func LoadWallet(net *chaincfg.Params, rpcuser, rpcpass, node string) (*Wallet, e
 	wallet.lastExternalIdx = wallet.getLastExternalIdx()
 	wallet.lastInternalIdx = wallet.getLastInternalIdx()
 	wallet.lastScannedBlock = wallet.getLastScannedBlock()
+	wallet.locked = true
 
 	err = wallet.loadExternalAddresses()
 	if err != nil {

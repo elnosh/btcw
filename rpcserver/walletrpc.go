@@ -1,6 +1,10 @@
 package rpcserver
 
-import "github.com/elnosh/btcw/wallet"
+import (
+	"time"
+
+	"github.com/elnosh/btcw/wallet"
+)
 
 type WalletRPC struct {
 	wallet *wallet.Wallet
@@ -33,5 +37,19 @@ func (w *WalletRPC) SendToAddress(args SendToArgs, reply *string) error {
 	}
 
 	*reply = txHash
+	return nil
+}
+
+type WalletPassphraseArgs struct {
+	Passphrase string
+	Duration   time.Duration
+}
+
+func (w *WalletRPC) WalletPassphrase(args WalletPassphraseArgs, reply *string) error {
+	err := w.wallet.WalletPassphrase(args.Passphrase, args.Duration)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }

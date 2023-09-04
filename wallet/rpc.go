@@ -3,9 +3,11 @@ package wallet
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/elnosh/btcw/tx"
+	"github.com/elnosh/btcw/utils"
 )
 
 var (
@@ -26,6 +28,10 @@ func (w *Wallet) GetNewAddress() (string, error) {
 }
 
 func (w *Wallet) SendToAddress(address string, amount float64) (string, error) {
+	if w.locked {
+		return "", fmt.Errorf("wallet is locked. unlock wallet with 'walletpassphrase' command first.")
+	}
+
 	amountToSend, err := btcutil.NewAmount(amount)
 	if err != nil {
 		return "", fmt.Errorf("invalid amount")
@@ -79,4 +85,15 @@ func (w *Wallet) SendToAddress(address string, amount float64) (string, error) {
 	w.updateWalletAfterTx(txToSend, selectedUtxos, amountToSend)
 
 	return txToSend.TxHash().String(), nil
+}
+
+func (w *Wallet) WalletPassphrase(passphrase string, duration time.Duration) error {
+	encodedHash := string(w.getEncodedHash())
+
+	if !utils.VerifyPassphrase(encodedHash, passphrase) {
+		return errors.New("invalid passphrase")
+	}
+
+	w.unlock(duration)
+	return nil
 }

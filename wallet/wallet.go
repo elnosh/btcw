@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
@@ -42,6 +43,8 @@ type Wallet struct {
 
 	// only for external addresses to track when receiving
 	addresses map[address]derivationPath
+
+	locked bool
 }
 
 func NewWallet(db *bolt.DB, net *chaincfg.Params) *Wallet {
@@ -179,6 +182,19 @@ func (w *Wallet) getPrivateKeyForUTXO(utxo tx.UTXO) (*btcutil.WIF, error) {
 	}
 
 	return wif, nil
+}
+
+func (w *Wallet) lock() {
+	w.locked = true
+}
+
+func (w *Wallet) unlock(duration time.Duration) {
+	w.locked = false
+
+	go func() {
+		time.Sleep(duration)
+		w.lock()
+	}()
 }
 
 func (w *Wallet) LogInfo(format string, v ...any) {
