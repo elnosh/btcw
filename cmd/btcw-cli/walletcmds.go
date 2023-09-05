@@ -35,11 +35,11 @@ func getBalance(ctx *cli.Context) error {
 
 	err = client.Call("WalletRPC.GetBalance", args, &reply)
 	if err != nil {
-		return err
+		printErr(err)
 	}
 
 	sats := btcutil.Amount(*reply)
-	fmt.Printf("balance: %v BTC\n", sats.ToBTC())
+	fmt.Printf("%v BTC\n", sats.ToBTC())
 	return nil
 }
 
@@ -51,7 +51,7 @@ var getNewAddressCmd = &cli.Command{
 func getNewAddress(ctx *cli.Context) error {
 	client, err := jsonrpc.Dial("tcp", "localhost:18557")
 	if err != nil {
-		return err
+		printErr(err)
 	}
 
 	var args struct{}
@@ -59,10 +59,10 @@ func getNewAddress(ctx *cli.Context) error {
 
 	err = client.Call("WalletRPC.GetNewAddress", args, &reply)
 	if err != nil {
-		return fmt.Errorf("error generating address: %s", err.Error())
+		printErr(fmt.Errorf("error generating address: %v", err))
 	}
 
-	fmt.Printf("address: %v\n", *reply)
+	fmt.Printf("%v\n", *reply)
 	return nil
 }
 
@@ -79,7 +79,7 @@ func SendToAddress(ctx *cli.Context) error {
 
 	cliArgs := ctx.Args()
 	if cliArgs.Len() != 2 {
-		return errors.New("please provide address and amount to send")
+		printErr(errors.New("please provide address and amount to send"))
 	}
 
 	// TODO: check this is a valid address
@@ -88,7 +88,7 @@ func SendToAddress(ctx *cli.Context) error {
 	amountStr := cliArgs.Get(1)
 	amount, err := strconv.ParseFloat(amountStr, 64)
 	if err != nil {
-		return errors.New("invalid amount")
+		printErr(errors.New("invalid amount"))
 	}
 
 	args := rpcserver.SendToArgs{
@@ -99,7 +99,7 @@ func SendToAddress(ctx *cli.Context) error {
 
 	err = client.Call("WalletRPC.SendToAddress", args, &reply)
 	if err != nil {
-		return err
+		printErr(err)
 	}
 
 	fmt.Println(*reply)
@@ -114,13 +114,13 @@ var walletPassphraseCmd = &cli.Command{
 func walletPassphrase(ctx *cli.Context) error {
 	client, err := jsonrpc.Dial("tcp", "localhost:18557")
 	if err != nil {
-		return err
+		printErr(err)
 	}
 
 	fmt.Println("enter passphrase to unlock wallet: ")
 	passphrase, err := term.ReadPassword(int(os.Stdin.Fd()))
 	if err != nil {
-		return errors.New("error reading passphrase, please try again")
+		printErr(errors.New("error reading passphrase, please try again"))
 	}
 
 	fmt.Println("provide duration (in seconds) to unlock wallet")
@@ -130,11 +130,11 @@ func walletPassphrase(ctx *cli.Context) error {
 
 	durationInt, err := strconv.Atoi(durationInput)
 	if err != nil {
-		return errors.New("invalid time provided. plese enter duration in seconds")
+		printErr(errors.New("invalid time provided. plese enter duration in seconds"))
 	}
 
 	if durationInt > maxWalletUnlockDuration {
-		return errors.New("unlock duration time too high. provide a duration below 3600 seconds (one hour)")
+		printErr(errors.New("unlock duration time too high. provide a duration below 3600 seconds (one hour)"))
 	}
 	timeSeconds := time.Second * time.Duration(durationInt)
 
@@ -146,7 +146,29 @@ func walletPassphrase(ctx *cli.Context) error {
 
 	err = client.Call("WalletRPC.WalletPassphrase", args, &reply)
 	if err != nil {
-		return err
+		printErr(err)
+	}
+
+	return nil
+}
+
+var walletLockCmd = &cli.Command{
+	Name:   "walletlock",
+	Action: walletLock,
+}
+
+func walletLock(ctx *cli.Context) error {
+	client, err := jsonrpc.Dial("tcp", "localhost:18557")
+	if err != nil {
+		printErr(err)
+	}
+
+	var args struct{}
+	var reply *string
+
+	err = client.Call("WalletRPC.WalletLock", args, &reply)
+	if err != nil {
+		printErr(err)
 	}
 
 	return nil

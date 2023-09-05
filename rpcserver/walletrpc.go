@@ -53,3 +53,8 @@ func (w *WalletRPC) WalletPassphrase(args WalletPassphraseArgs, reply *string) e
 
 	return nil
 }
+
+func (w *WalletRPC) WalletLock(args struct{}, reply *string) error {
+	w.wallet.WalletLock()
+	return nil
+}

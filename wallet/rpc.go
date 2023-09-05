@@ -97,3 +97,7 @@ func (w *Wallet) WalletPassphrase(passphrase string, duration time.Duration) err
 	w.unlock(duration)
 	return nil
 }
+
+func (w *Wallet) WalletLock() {
+	w.lock()
+}
