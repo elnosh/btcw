@@ -26,7 +26,7 @@ type NodeClient interface {
 }
 
 var (
-	defaultFee = btcutil.Amount(5)
+	defaultFee = btcutil.Amount(2)
 )
 
 var (

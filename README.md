@@ -4,8 +4,8 @@ btcw is a bitcoin testnet wallet.
 Why another bitcoin wallet? So that you could send some coins to it and lose them all! Kidding...
 This was purely for educational purposes for me to learn more about bitcoin and see how I would go about building one.
 
-It only has the most basic functionality to generate addresses, build transactions,
-sign them, and broadcast to the network. It implements BIP-44 hierarchical deterministic wallets. 
+It only has the most basic functionality like generating addresses, detect receiving transactions 
+to those addresses, building and signing transactions. It implements BIP-44 hierarchical deterministic wallets. 
 
 
 ## requirements

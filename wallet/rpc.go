@@ -41,9 +41,6 @@ func (w *Wallet) SendToAddress(address string, amount float64) (string, error) {
 		return "", ErrInsufficientFunds
 	}
 
-	// get estimate fee from btc node
-	fee := w.client.EstimateFee(1)
-
 	// select utxos from wallet to fulfill amountToSend
 	selectedUtxos, _, err := tx.SelectUTXOs(amountToSend, w.utxos)
 	if err != nil {
@@ -52,7 +49,7 @@ func (w *Wallet) SendToAddress(address string, amount float64) (string, error) {
 	}
 
 	// create unsigned tx from the selected utxos
-	txToSend, err := w.createRawTransaction(address, amountToSend, fee, selectedUtxos)
+	txToSend, err := w.createRawTransaction(address, amountToSend, defaultFee, selectedUtxos)
 	if err != nil {
 		w.LogError("unable to send to address - error creating transaction: %s", err.Error())
 		return "", err

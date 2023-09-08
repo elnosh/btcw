@@ -39,7 +39,7 @@ func getBalance(ctx *cli.Context) error {
 	}
 
 	sats := btcutil.Amount(*reply)
-	fmt.Printf("%v BTC\n", sats.ToBTC())
+	fmt.Printf("%v\n", sats.String())
 	return nil
 }
 
