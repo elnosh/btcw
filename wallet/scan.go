@@ -30,6 +30,7 @@ func (w *Wallet) scanMissingBlocks() {
 
 		w.scanBlock(nextBlockHash)
 	}
+	w.LogInfo("Finished scanning. Synced with blockchain at height: %v", w.lastScannedBlock)
 }
 
 // scanBlockTxs scans the new block received for addresses owned by

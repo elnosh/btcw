@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"net/rpc"
 	"net/rpc/jsonrpc"
 	"os"
 	"strconv"
@@ -15,6 +16,16 @@ import (
 	"golang.org/x/term"
 )
 
+var client *rpc.Client
+
+func init() {
+	var err error
+	client, err = jsonrpc.Dial("tcp", "localhost:18557")
+	if err != nil {
+		printErr(err)
+	}
+}
+
 const (
 	maxWalletUnlockDuration = 3600 // one hour
 )
@@ -25,15 +36,10 @@ var getBalanceCmd = &cli.Command{
 }
 
 func getBalance(ctx *cli.Context) error {
-	client, err := jsonrpc.Dial("tcp", "localhost:18557")
-	if err != nil {
-		return err
-	}
-
 	var args struct{}
 	var reply *int64
 
-	err = client.Call("WalletRPC.GetBalance", args, &reply)
+	err := client.Call("WalletRPC.GetBalance", args, &reply)
 	if err != nil {
 		printErr(err)
 	}
@@ -49,15 +55,10 @@ var getNewAddressCmd = &cli.Command{
 }
 
 func getNewAddress(ctx *cli.Context) error {
-	client, err := jsonrpc.Dial("tcp", "localhost:18557")
-	if err != nil {
-		printErr(err)
-	}
-
 	var args struct{}
 	var reply *string
 
-	err = client.Call("WalletRPC.GetNewAddress", args, &reply)
+	err := client.Call("WalletRPC.GetNewAddress", args, &reply)
 	if err != nil {
 		printErr(fmt.Errorf("error generating address: %v", err))
 	}
@@ -72,11 +73,6 @@ var sendToAddressCmd = &cli.Command{
 }
 
 func SendToAddress(ctx *cli.Context) error {
-	client, err := jsonrpc.Dial("tcp", "localhost:18557")
-	if err != nil {
-		return err
-	}
-
 	cliArgs := ctx.Args()
 	if cliArgs.Len() != 2 {
 		printErr(errors.New("please provide address and amount to send"))
@@ -112,11 +108,6 @@ var walletPassphraseCmd = &cli.Command{
 }
 
 func walletPassphrase(ctx *cli.Context) error {
-	client, err := jsonrpc.Dial("tcp", "localhost:18557")
-	if err != nil {
-		printErr(err)
-	}
-
 	fmt.Println("enter passphrase to unlock wallet: ")
 	passphrase, err := term.ReadPassword(int(os.Stdin.Fd()))
 	if err != nil {
@@ -158,15 +149,10 @@ var walletLockCmd = &cli.Command{
 }
 
 func walletLock(ctx *cli.Context) error {
-	client, err := jsonrpc.Dial("tcp", "localhost:18557")
-	if err != nil {
-		printErr(err)
-	}
-
 	var args struct{}
 	var reply *string
 
-	err = client.Call("WalletRPC.WalletLock", args, &reply)
+	err := client.Call("WalletRPC.WalletLock", args, &reply)
 	if err != nil {
 		printErr(err)
 	}

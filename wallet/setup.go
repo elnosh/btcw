@@ -175,5 +175,14 @@ func LoadWallet(net *chaincfg.Params, rpcuser, rpcpass, node string) (*Wallet, e
 		return nil, err
 	}
 
+	// if this is new wallet, set last scanned block to current height of chain - 10
+	// no need to scan entire blockchain if wallet is new
+	if wallet.lastScannedBlock == 0 {
+		chainHeight, err := wallet.client.GetBlockCount()
+		if err != nil {
+			return nil, err
+		}
+		wallet.setLastScannedBlock(chainHeight - 10)
+	}
 	return wallet, nil
 }
