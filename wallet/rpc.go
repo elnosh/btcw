@@ -62,12 +62,6 @@ func (w *Wallet) SendToAddress(address string, amount float64) (string, error) {
 		return "", fmt.Errorf("error signing transaction: %s", err.Error())
 	}
 
-	err = validateSignedTransaction(txToSend, selectedUtxos)
-	if err != nil {
-		w.LogError("unable to send to address - invalid transaction: %s", err.Error())
-		return "", fmt.Errorf("error validating transaction: %s", err.Error())
-	}
-
 	// send tx to network after validating
 	_, err = w.client.SendRawTransaction(txToSend, true)
 	if err != nil {

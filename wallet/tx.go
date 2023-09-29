@@ -61,6 +61,13 @@ func (w *Wallet) createRawTransaction(address string, amountToSend, feeRate btcu
 // signTransaction will sign all inputs in tx using the keys associated with
 // the utxos referenced
 func (w *Wallet) signTransaction(tx *wire.MsgTx, utxos []tx.UTXO) error {
+	prevOuts := make(map[wire.OutPoint]*wire.TxOut, 1)
+	inputFetcher := txscript.NewMultiPrevOutFetcher(prevOuts)
+	for i, txIn := range tx.TxIn {
+		inputFetcher.AddPrevOut(txIn.PreviousOutPoint, wire.NewTxOut(int64(utxos[i].Value), utxos[i].ScriptPubKey))
+	}
+	sigHashes := txscript.NewTxSigHashes(tx, inputFetcher)
+
 	for i, txIn := range tx.TxIn {
 		utxo := utxos[i]
 
@@ -70,12 +77,25 @@ func (w *Wallet) signTransaction(tx *wire.MsgTx, utxos []tx.UTXO) error {
 			return err
 		}
 
-		scriptSig, err := txscript.SignatureScript(tx, i, utxo.ScriptPubKey,
-			txscript.SigHashAll, wif.PrivKey, wif.CompressPubKey)
-		if err != nil {
-			return err
+		scriptClass := txscript.GetScriptClass(utxo.ScriptPubKey)
+		switch scriptClass {
+		case txscript.WitnessV0PubKeyHashTy:
+			witness, err := txscript.WitnessSignature(tx, sigHashes, i, int64(utxo.Value),
+				utxo.ScriptPubKey, txscript.SigHashAll, wif.PrivKey, wif.CompressPubKey)
+			if err != nil {
+				return err
+			}
+			txIn.Witness = witness
+
+		case txscript.PubKeyHashTy:
+			scriptSig, err := txscript.SignatureScript(tx, i, utxo.ScriptPubKey,
+				txscript.SigHashAll, wif.PrivKey, wif.CompressPubKey)
+			if err != nil {
+				return err
+			}
+			txIn.SignatureScript = scriptSig
 		}
-		txIn.SignatureScript = scriptSig
+
 	}
 
 	return nil
