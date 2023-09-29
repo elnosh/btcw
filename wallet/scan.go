@@ -45,30 +45,16 @@ func (w *Wallet) scanBlockTxs(blockHash string, txsInBlock []*btcutil.Tx) {
 				w.LogError("error scanning block - could not parse tx pkScript: %v", err)
 			}
 
-			addr, err := script.Address(w.network)
-			if err != nil {
-				w.LogError("error scanning block - could not get address: %v", err)
-			}
-
-			addrStr := addr.String()
-			path, ok := w.addresses[addrStr]
-			// if ok, output found that sends to address owned by wallet
+			path, ok := w.checkSpendToAddress(script)
+			// if match is found
+			// add UTXO and update wallet balance
 			if ok {
 				w.LogInfo("found new receiving transaction in block %s", blockHash)
 				value := btcutil.Amount(txOut.Value)
 				txid := txb.Hash().String()
 
 				utxo := tx.NewUTXO(txid, uint32(voutIdx), value, script.Script(), path)
-				if err := w.addUTXO(*utxo); err != nil {
-					w.LogError("error adding receiving UTXO to wallet: %v", err)
-				}
-
-				balance := w.balance + utxo.Value
-				if err := w.setBalance(balance); err != nil {
-					w.LogError("error updating balance for new receiving UTXO: %v", err)
-				}
-
-				w.LogInfo("added new transaction %s to wallet", txid)
+				w.updateWalletWithUTXO(utxo)
 			}
 		}
 	}
@@ -129,51 +115,58 @@ func (w *Wallet) scanBlock(blockHash *chainhash.Hash) {
 
 	for _, rawTx := range txsInBlock {
 		for _, vout := range rawTx.Vout {
-			script, err := hex.DecodeString(vout.ScriptPubKey.Hex)
+			scriptPubKey, err := hex.DecodeString(vout.ScriptPubKey.Hex)
 			if err != nil {
 				w.LogError("error decoding hex script: %v", err)
 				return
 			}
 
-			// this will extract the address from the script
-			class, addrs, _, err := txscript.ExtractPkScriptAddrs(script, w.network)
+			script, err := txscript.ParsePkScript(scriptPubKey)
 			if err != nil {
-				w.LogError("error extractring address script info: %v", err)
-				return
+				w.LogError("error scanning block - could not parse tx pkScript: %v", err)
 			}
 
-			// only handling pub key hash for now
-			if class == txscript.PubKeyHashTy {
-				// check if address extracted from script is in wallet
-				addr := addrs[0].String()
-				path, ok := w.addresses[addr]
-				// if match is found
-				// add UTXO and update wallet balance
-				if ok {
-					w.LogInfo("found new receiving transaction in block %s", block.Hash)
-					utxoAmount, err := btcutil.NewAmount(vout.Value)
-					if err != nil {
-						w.LogError("error getting tx amount: %v", err)
-						return
-					}
-
-					utxo := tx.NewUTXO(rawTx.Txid, vout.N, utxoAmount, script, path)
-					if err := w.addUTXO(*utxo); err != nil {
-						w.LogError("error adding new UTXO: %v", err)
-						return
-					}
-
-					balance := w.balance + utxoAmount
-					if err := w.setBalance(balance); err != nil {
-						w.LogError("error setting wallet balance: %v", err)
-						return
-					}
-					w.LogInfo("added new transaction %s to wallet", rawTx.Txid)
+			// if match is found
+			// add UTXO and update wallet balance
+			path, ok := w.checkSpendToAddress(script)
+			if ok {
+				w.LogInfo("found new receiving transaction in block %s", block.Hash)
+				utxoAmount, err := btcutil.NewAmount(vout.Value)
+				if err != nil {
+					w.LogError("error getting tx amount: %v", err)
+					return
 				}
+
+				utxo := tx.NewUTXO(rawTx.Txid, vout.N, utxoAmount, script.Script(), path)
+				w.updateWalletWithUTXO(utxo)
 			}
 
 		}
 	}
 	// increase last scanned block
 	w.setLastScannedBlock(w.lastScannedBlock + 1)
+}
+
+func (w *Wallet) checkSpendToAddress(script txscript.PkScript) (string, bool) {
+	addr, err := script.Address(w.network)
+	if err != nil {
+		w.LogError("error scanning block - could not get address: %v", err)
+	}
+
+	path, ok := w.addresses[addr.String()]
+	return path, ok
+}
+
+func (w *Wallet) updateWalletWithUTXO(utxo *tx.UTXO) {
+	if err := w.addUTXO(*utxo); err != nil {
+		w.LogError("error adding new UTXO: %v", err)
+		return
+	}
+
+	balance := w.balance + utxo.Value
+	if err := w.setBalance(balance); err != nil {
+		w.LogError("error setting wallet balance: %v", err)
+		return
+	}
+	w.LogInfo("added new transaction %s to wallet", utxo.TxID)
 }

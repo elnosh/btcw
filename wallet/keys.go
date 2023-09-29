@@ -39,24 +39,25 @@ func (w *Wallet) newKeyPair(extendedKey *hdkeychain.ExtendedKey) (*KeyPair, erro
 	// encrypt wif for storage
 	encryptedWIF, err := utils.Encrypt([]byte(wif.String()), passKey)
 	if err != nil {
-		return nil, fmt.Errorf("error encrypting private key: %v", err.Error())
+		return nil, fmt.Errorf("error encrypting private key: %v", err)
 	}
 
 	// get serialized compressed public key from private key
 	serializedPubKey := wif.SerializePubKey()
 
-	// derive public key hash and address string from the
-	// serialized public key
-	addrPubKey, err := btcutil.NewAddressPubKey(serializedPubKey, w.network)
+	pubKey, err := btcutil.NewAddressPubKey(serializedPubKey, w.network)
 	if err != nil {
-		return nil, fmt.Errorf("error deriving address pub key: %v", err.Error())
+		return nil, fmt.Errorf("error deriving address pub key: %v", err)
 	}
-	addrPubKeyHash := addrPubKey.AddressPubKeyHash()
-	pubkeyHash := addrPubKeyHash.ScriptAddress()
-	addr := addrPubKeyHash.String()
+
+	segwitPubKeyHash, err := btcutil.NewAddressWitnessPubKeyHash(pubKey.AddressPubKeyHash().Hash160()[:], w.network)
+	if err != nil {
+		return nil, fmt.Errorf("error deriving witness address: %v", err)
+	}
+	addr := segwitPubKeyHash.AddressSegWit.String()
 
 	keyPair := &KeyPair{PublicKey: serializedPubKey, EncryptedPrivateKey: encryptedWIF,
-		PublicKeyHash: pubkeyHash, Address: addr}
+		PublicKeyHash: segwitPubKeyHash.ScriptAddress(), Address: addr}
 	return keyPair, nil
 }
 
